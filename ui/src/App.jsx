@@ -6,49 +6,61 @@ export default function App() {
     {
       id: 1,
       sender: 'companion',
-      text: 'SYSTEM ONLINE: Welcome! I am your Retro AI Companion. I can speak to you out loud. Tap COMMUNICATE to speak via voice or type a message below.',
+      text: 'OKUDAGRAM SYSTEM INITIALIZED: Rigel station core active. Voice and neural interface standby.',
     },
   ]);
 
   const [inputText, setInputText] = useState('');
   const [isTalking, setIsTalking] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
-  const [isVoiceMuted, setIsVoiceMuted] = useState(false);
-  const [status, setStatus] = useState({
-    online: true,
-    model: 'llama3.2:1b',
-  });
+  const [isMuted, setIsMuted] = useState(false);
+
+  // Dynamic Live Metrics (matching image telemetry)
+  const [cycles, setCycles] = useState(13386);
+  const [powerMetric, setPowerMetric] = useState(1636);
+  const [technoSig, setTechnoSig] = useState(16);
+  const [olivinePpm, setOlivinePpm] = useState(76);
 
   const canvasRef = useRef(null);
   const chatEndRef = useRef(null);
   const animFrameRef = useRef(null);
   const recognitionRef = useRef(null);
 
-  // Auto-scroll chat to bottom
+  // Increment dynamic cycles & power metrics for responsive feel
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCycles((c) => c + 1);
+      if (isTalking) {
+        setPowerMetric(1600 + Math.floor(Math.random() * 120));
+        setOlivinePpm(70 + Math.floor(Math.random() * 25));
+      } else {
+        setPowerMetric(1636);
+        setOlivinePpm(76);
+      }
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [isTalking]);
+
+  // Auto-scroll chat
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isThinking]);
 
-  // Speak companion text out loud using browser Speech Synthesis API
+  // Spoken voice TTS
   const speakText = (text) => {
-    if (isVoiceMuted) return;
-
+    if (isMuted) return;
     if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel(); // Stop prior speech
-      
-      // Clean up text (remove markdown asterisks or code symbols for smooth reading)
-      const cleanText = text.replace(/[\*\_#\`]/g, '');
-
-      const utterance = new SpeechSynthesisUtterance(cleanText);
+      window.speechSynthesis.cancel();
+      const clean = text.replace(/[\*\_#\`]/g, '');
+      const utterance = new SpeechSynthesisUtterance(clean);
       utterance.rate = 1.0;
-      utterance.pitch = 0.95; // Retro computer tone
+      utterance.pitch = 0.92;
 
-      // Try to pick a crisp natural English voice if available
       const voices = window.speechSynthesis.getVoices();
-      const preferredVoice = voices.find(
-        (v) => v.lang.startsWith('en') && (v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('David') || v.name.includes('Zira'))
+      const preferred = voices.find(
+        (v) => v.lang.startsWith('en') && (v.name.includes('Natural') || v.name.includes('David') || v.name.includes('Zira'))
       );
-      if (preferredVoice) utterance.voice = preferredVoice;
+      if (preferred) utterance.voice = preferred;
 
       utterance.onstart = () => setIsTalking(true);
       utterance.onend = () => setIsTalking(false);
@@ -58,64 +70,71 @@ export default function App() {
     }
   };
 
-  // Canvas Oscilloscope Rendering Loop
+  // Wireframe Station / Orbital Core 3D Canvas Renderer (matching the diagram in the reference image)
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    let phase = 0;
+    let angle = 0;
 
     const render = () => {
-      const width = (canvas.width = canvas.parentElement.clientWidth || 280);
-      const height = (canvas.height = canvas.parentElement.clientHeight || 180);
+      const width = (canvas.width = canvas.parentElement.clientWidth || 240);
+      const height = (canvas.height = canvas.parentElement.clientHeight || 160);
+      const cx = width / 2;
+      const cy = height / 2;
 
       ctx.clearRect(0, 0, width, height);
 
-      // Grid background effect
-      ctx.strokeStyle = 'rgba(0, 242, 254, 0.07)';
+      // Outer wireframe grid lines
+      ctx.strokeStyle = '#291e1c';
       ctx.lineWidth = 1;
-      for (let x = 0; x < width; x += 20) {
+      ctx.beginPath();
+      ctx.arc(cx, cy, 65, 0, Math.PI * 2);
+      ctx.arc(cx, cy, 45, 0, Math.PI * 2);
+      ctx.arc(cx, cy, 25, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Crosshairs
+      ctx.beginPath();
+      ctx.moveTo(cx - 75, cy); ctx.lineTo(cx + 75, cy);
+      ctx.moveTo(cx, cy - 75); ctx.lineTo(cx, cy + 75);
+      ctx.stroke();
+
+      // Rotating Station Spokes & Nodes
+      const spokeCount = 16;
+      const speed = isTalking ? 0.04 : isThinking ? 0.06 : 0.015;
+
+      for (let i = 0; i < spokeCount; i++) {
+        const theta = angle + (i * Math.PI * 2) / spokeCount;
+        const r1 = 15;
+        const r2 = 55 + Math.sin(angle * 2 + i) * (isTalking ? 8 : 2);
+
+        const x1 = cx + Math.cos(theta) * r1;
+        const y1 = cy + Math.sin(theta) * r1;
+        const x2 = cx + Math.cos(theta) * r2;
+        const y2 = cy + Math.sin(theta) * r2;
+
+        ctx.strokeStyle = i % 2 === 0 ? '#ef475a' : '#f79256';
+        ctx.lineWidth = 1.5;
         ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, height);
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
         ctx.stroke();
-      }
-      for (let y = 0; y < height; y += 20) {
+
+        // Node dots
+        ctx.fillStyle = '#f4b942';
         ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(width, y);
-        ctx.stroke();
+        ctx.arc(x2, y2, 2.5, 0, Math.PI * 2);
+        ctx.fill();
       }
 
-      // Dynamic Oscilloscope Waves
-      const isBusy = isTalking || isThinking;
-      const waveCount = isBusy ? 4 : 2;
-      const baseAmp = isBusy ? 35 : 12;
+      // Center Eye Ring
+      ctx.fillStyle = isThinking ? '#f4b942' : isTalking ? '#ef475a' : '#dfd3c3';
+      ctx.beginPath();
+      ctx.arc(cx, cy, 8, 0, Math.PI * 2);
+      ctx.fill();
 
-      for (let w = 0; w < waveCount; w++) {
-        ctx.beginPath();
-        ctx.lineWidth = w === 0 ? 3 : 1.5;
-
-        if (isThinking) {
-          ctx.strokeStyle = w % 2 === 0 ? 'rgba(255, 183, 3, 0.9)' : 'rgba(255, 0, 127, 0.7)';
-        } else if (isTalking) {
-          ctx.strokeStyle = w % 2 === 0 ? 'rgba(0, 242, 254, 0.9)' : 'rgba(79, 172, 254, 0.7)';
-        } else {
-          ctx.strokeStyle = 'rgba(0, 242, 254, 0.4)';
-        }
-
-        for (let x = 0; x < width; x++) {
-          const freq = 0.02 + w * 0.008;
-          const amp = baseAmp * Math.sin(phase * 0.4 + w);
-          const y = height / 2 + Math.sin(x * freq + phase + w * 1.5) * amp;
-
-          if (x === 0) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
-        }
-        ctx.stroke();
-      }
-
-      phase += isBusy ? 0.12 : 0.04;
+      angle += speed;
       animFrameRef.current = requestAnimationFrame(render);
     };
 
@@ -123,14 +142,14 @@ export default function App() {
     return () => cancelAnimationFrame(animFrameRef.current);
   }, [isTalking, isThinking]);
 
-  // Send message to local Llama backend
-  const handleSendMessage = async (textToSend) => {
-    const prompt = textToSend || inputText;
+  // Handle LLM API Chat Call
+  const handleSend = async (customPrompt) => {
+    const prompt = customPrompt || inputText;
     if (!prompt.trim() || isThinking) return;
 
     const userMsg = { id: Date.now(), sender: 'user', text: prompt };
     setMessages((prev) => [...prev, userMsg]);
-    if (!textToSend) setInputText('');
+    if (!customPrompt) setInputText('');
 
     setIsThinking(true);
 
@@ -143,52 +162,34 @@ export default function App() {
 
       if (res.ok) {
         const data = await res.json();
-        const companionReply = data.response || "I am right here listening!";
-
+        const reply = data.response || 'Telemetry check complete. Systems normal.';
         setIsThinking(false);
 
-        const companionMsg = { id: Date.now() + 1, sender: 'companion', text: companionReply };
-        setMessages((prev) => [...prev, companionMsg]);
-
-        // Speak the response out loud
-        speakText(companionReply);
+        setMessages((prev) => [...prev, { id: Date.now() + 1, sender: 'companion', text: reply }]);
+        speakText(reply);
       } else {
-        throw new Error('API request failed');
+        throw new Error('API Error');
       }
-    } catch (err) {
+    } catch (e) {
       setIsThinking(false);
       setIsTalking(false);
-      const errorMsg = '[SYSTEM ALERT] Unable to reach backend server. Please verify FastAPI backend is running.';
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: Date.now() + 2,
-          sender: 'companion',
-          text: errorMsg,
-        },
-      ]);
-      speakText("Warning: Unable to reach backend server.");
+      const fallback = '[ALERT] Rigel telemetry connection error. Verify local backend server status.';
+      setMessages((prev) => [...prev, { id: Date.now() + 2, sender: 'companion', text: fallback }]);
+      speakText('Connection warning.');
     }
   };
 
-  // Toggle Live Speech Microphone Input
-  const toggleVoiceInteraction = () => {
+  // Push to talk mic
+  const toggleVoice = () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
-      // Fallback if browser doesn't support Web Speech API
-      const simulatedPrompts = [
-        "Tell me a short story about an AI companion in the year 2088.",
-        "How are you feeling today, companion?",
-        "Give me a quick tip for building hardware projects."
-      ];
-      const randomPrompt = simulatedPrompts[Math.floor(Math.random() * simulatedPrompts.length)];
-      handleSendMessage(randomPrompt);
+      handleSend('Give me a status update on the Rigel system.');
       return;
     }
 
     if (isTalking) {
-      window.speechSynthesis.cancel();
+      window.speechSynthesis?.cancel();
       setIsTalking(false);
       return;
     }
@@ -200,10 +201,10 @@ export default function App() {
       rec.lang = 'en-US';
 
       rec.onstart = () => setIsTalking(true);
-      rec.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
+      rec.onresult = (e) => {
+        const text = e.results[0][0].transcript;
         setIsTalking(false);
-        if (transcript) handleSendMessage(transcript);
+        if (text) handleSend(text);
       };
       rec.onerror = () => setIsTalking(false);
       rec.onend = () => setIsTalking(false);
@@ -218,83 +219,118 @@ export default function App() {
   };
 
   return (
-    <div className="retro-container">
-      {/* Top Header */}
-      <header className="retro-header">
-        <div className="retro-brand">
-          <div className="retro-orb"></div>
-          <span className="retro-title">COMPANION AI // MK-I</span>
+    <div className="oku-container">
+      {/* Top Okudagram Frame */}
+      <header className="oku-top-panel">
+        <div className="oku-top-header">
+          <div className="oku-pill-group">
+            <div className="oku-pill-tag">crisis era <span>34 T.E</span></div>
+            <div className="oku-pill-tag">cycles <span>{cycles.toLocaleString()}</span></div>
+            <div className="oku-pill-tag">mass dots <span>46</span></div>
+            <div className="oku-pill-tag">dual vector foils <span>2.0156</span></div>
+          </div>
+          <div className="oku-pill-tag">
+            STATUS: <span>{isThinking ? 'COMPUTING' : isTalking ? 'TRANSMITTING' : 'STEADY'}</span>
+          </div>
         </div>
 
-        <div className="retro-status-group">
-          <button
-            className="status-badge"
-            style={{ cursor: 'pointer' }}
-            onClick={() => {
-              setIsVoiceMuted(!isVoiceMuted);
-              if (!isVoiceMuted) window.speechSynthesis?.cancel();
-            }}
-          >
-            <span className={`led-dot ${!isVoiceMuted ? 'active' : 'busy'}`}></span>
-            <span>VOICE: {!isVoiceMuted ? 'SPEAKER ON' : 'MUTED'}</span>
-          </button>
-          <div className="status-badge">
-            <span className={`led-dot ${status.online ? 'active' : ''}`}></span>
-            <span>SYSTEM: ONLINE</span>
+        <div className="oku-top-grid">
+          {/* Visualizer Station Diagram Box */}
+          <div className="oku-visualizer-box">
+            <canvas ref={canvasRef} className="oku-canvas" />
           </div>
-          <div className="status-badge">
-            <span className={`led-dot ${isThinking ? 'busy' : isTalking ? 'pink' : 'active'}`}></span>
-            <span>MODEL: {status.model}</span>
+
+          {/* Big kW/kg Metric Readout */}
+          <div className="oku-metric-display">
+            <div className="oku-huge-num">{powerMetric}</div>
+            <div className="oku-unit-label">kW/kg</div>
+            <div className="oku-coords-row">
+              <span>3.009°</span>
+              <span>6.016°</span>
+              <span>2.119°</span>
+              <span>rigel system</span>
+            </div>
+          </div>
+
+          {/* Segmented Radial Dial SVG Widget (Matching Image Right Dial) */}
+          <div className="oku-dial-widget">
+            <svg viewBox="0 0 100 100" className="oku-dial-svg">
+              {/* Outer Ring */}
+              <circle cx="50" cy="50" r="44" fill="none" stroke="#f79256" strokeWidth="10" strokeDasharray="60 30" />
+              <circle cx="50" cy="50" r="44" fill="none" stroke="#ef475a" strokeWidth="10" strokeDasharray="30 120" strokeDashoffset="-90" />
+              {/* Middle Ring */}
+              <circle cx="50" cy="50" r="30" fill="none" stroke="#dfd3c3" strokeWidth="8" strokeDasharray="80 20" />
+              <circle cx="50" cy="50" r="30" fill="none" stroke="#ef475a" strokeWidth="8" strokeDasharray="30 70" strokeDashoffset="-40" />
+              {/* Inner Circle with Label */}
+              <circle cx="50" cy="50" r="18" fill="#120e0d" stroke="#f4b942" strokeWidth="2" />
+              <text x="50" y="54" fill="#dfd3c3" fontSize="10" fontWeight="bold" textAnchor="middle" fontFamily="monospace">z4</text>
+              <text x="78" y="32" fill="#120e0d" fontSize="7" fontWeight="bold" fontFamily="sans-serif">&gt;&gt;&gt; +</text>
+              <text x="18" y="52" fill="#120e0d" fontSize="7" fontWeight="bold" fontFamily="sans-serif">q3</text>
+              <text x="74" y="74" fill="#120e0d" fontSize="7" fontWeight="bold" fontFamily="sans-serif">b2</text>
+            </svg>
           </div>
         </div>
       </header>
 
-      {/* Main Body */}
-      <main className="retro-body">
-        {/* Left Column: AI Core Avatar & Voice Push Button */}
-        <section className="retro-card ai-core-panel">
-          <div className="retro-card-header">
-            <span>[ OSCILLOSCOPE ]</span>
-          </div>
-
-          <div className="oscilloscope-screen">
-            <canvas ref={canvasRef} className="oscilloscope-canvas" />
-          </div>
-
-          <div className="core-avatar-display">
-            <div className="ai-state-label">
-              {isThinking ? '⚡ THINKING...' : isTalking ? '🎙️ SPEAKING / LISTENING' : '🟢 READY'}
-            </div>
-          </div>
-
-          <button
-            className={`retro-talk-btn ${isTalking ? 'recording' : ''}`}
-            onClick={toggleVoiceInteraction}
-          >
-            <span>{isTalking ? '⏹️ STOP / INTERRUPT' : '⚡ COMMUNICATE (VOICE)'}</span>
+      {/* Bottom Okudagram Panel */}
+      <main className="oku-bottom-panel">
+        {/* Left Stack Controls */}
+        <div className="oku-button-stack">
+          <button className="oku-btn" onClick={() => handleSend('Regenerate system diagnostic response.')}>
+            regenerate
           </button>
-        </section>
+          <button className={`oku-btn pink ${isTalking ? 'active' : ''}`} onClick={toggleVoice}>
+            recon (voice)
+          </button>
+          <button className="oku-btn orange" onClick={() => handleSend()}>
+            engage
+          </button>
+          <button className="oku-btn" onClick={() => setIsMuted(!isMuted)}>
+            synthesis {isMuted ? '[off]' : '[on]'}
+          </button>
+          <button className="oku-btn" onClick={() => setMessages([])}>
+            atomise
+          </button>
+        </div>
 
-        {/* Right Column: Conversational Chat Panel */}
-        <section className="retro-card chat-panel">
-          <div className="retro-card-header">
-            <span>[ CONVERSATION FEED ]</span>
-            <span style={{ color: 'var(--text-phosphor)' }}>{messages.length} MESSAGES</span>
+        {/* Vertical Capsule Bars (Matching Image Center Pillars) */}
+        <div className="oku-capsules-group">
+          <div className="oku-capsule orange">
+            <span className="capsule-symbol">ø6</span>
+            <div style={{ fontSize: '0.7rem' }}>13_176</div>
+          </div>
+          <div className="oku-capsule yellow">
+            <span>NO₂</span>
+            <div style={{ fontSize: '0.7rem' }}>21_226</div>
+          </div>
+          <div className="oku-capsule cream">
+            <span>H₂S</span>
+            <div className="capsule-symbol">⋔7 ¤3</div>
+          </div>
+          <div className="oku-capsule taupe">
+            <span>spin</span>
+            <div style={{ fontSize: '0.75rem', textAlign: 'center' }}>406 cycle steady</div>
+          </div>
+        </div>
+
+        {/* Interactive Okudagram Conversational Chat */}
+        <section className="oku-chat-box">
+          <div className="oku-chat-header">
+            <span>RIGEL NEURAL CHAT INTERFACE</span>
+            <span>ø13_49_66</span>
           </div>
 
-          <div className="chat-history">
-            {messages.map((msg) => (
-              <div key={msg.id} className={`chat-bubble ${msg.sender}`}>
-                <span className="speaker-tag">
-                  {msg.sender === 'user' ? '► USER' : '❖ COMPANION'}
-                </span>
-                <p>{msg.text}</p>
+          <div className="oku-chat-messages">
+            {messages.map((m) => (
+              <div key={m.id} className={`oku-msg ${m.sender}`}>
+                <div className="oku-msg-sender">{m.sender === 'user' ? '► RECON USER' : '❖ COMPANION'}</div>
+                <div>{m.text}</div>
               </div>
             ))}
             {isThinking && (
-              <div className="chat-bubble companion">
-                <span className="speaker-tag">❖ COMPANION</span>
-                <p>⚡ Processing response from Llama-3.2-1B...</p>
+              <div className="oku-msg companion">
+                <div className="oku-msg-sender">❖ COMPANION</div>
+                <div>⚡ Processing neural output...</div>
               </div>
             )}
             <div ref={chatEndRef} />
@@ -303,23 +339,33 @@ export default function App() {
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              handleSendMessage();
+              handleSend();
             }}
-            className="chat-input-area"
+            className="oku-chat-form"
           >
             <input
               type="text"
-              className="retro-text-input"
-              placeholder="Type message to your companion..."
+              className="oku-chat-input"
+              placeholder="Input query for companion..."
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
             />
-            <button type="submit" className="retro-send-btn">
-              SEND ►
+            <button type="submit" className="oku-chat-submit">
+              ENGAGE ►
             </button>
           </form>
         </section>
       </main>
+
+      {/* Telemetry Footer Strip */}
+      <footer className="oku-telemetry-row">
+        <div className="oku-telemetry-item">techo-signatures: <span>{technoSig}/466</span></div>
+        <div className="oku-telemetry-item">voids: <span>16%</span></div>
+        <div className="oku-telemetry-item">olivine deposits: <span>{olivinePpm} ppm (above average)</span></div>
+        <div className="oku-telemetry-item">amines: <span>null</span></div>
+        <div className="oku-telemetry-item">biofilms: <span>null</span></div>
+        <div className="oku-telemetry-item">photolysis: <span>potent</span></div>
+      </footer>
     </div>
   );
 }
