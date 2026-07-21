@@ -6,13 +6,14 @@ export default function App() {
     {
       id: 1,
       sender: 'companion',
-      text: 'SYSTEM ONLINE: Welcome! I am your Retro AI Companion. Tap COMMUNICATE to speak via voice or type a message below to begin our conversation.',
+      text: 'SYSTEM ONLINE: Welcome! I am your Retro AI Companion. I can speak to you out loud. Tap COMMUNICATE to speak via voice or type a message below.',
     },
   ]);
 
   const [inputText, setInputText] = useState('');
   const [isTalking, setIsTalking] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
+  const [isVoiceMuted, setIsVoiceMuted] = useState(false);
   const [status, setStatus] = useState({
     online: true,
     model: 'llama3.2:1b',
@@ -21,13 +22,43 @@ export default function App() {
   const canvasRef = useRef(null);
   const chatEndRef = useRef(null);
   const animFrameRef = useRef(null);
+  const recognitionRef = useRef(null);
 
   // Auto-scroll chat to bottom
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isThinking]);
 
-  // Canvas Oscilloscope / Retro Visualizer Rendering Loop
+  // Speak companion text out loud using browser Speech Synthesis API
+  const speakText = (text) => {
+    if (isVoiceMuted) return;
+
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel(); // Stop prior speech
+      
+      // Clean up text (remove markdown asterisks or code symbols for smooth reading)
+      const cleanText = text.replace(/[\*\_#\`]/g, '');
+
+      const utterance = new SpeechSynthesisUtterance(cleanText);
+      utterance.rate = 1.0;
+      utterance.pitch = 0.95; // Retro computer tone
+
+      // Try to pick a crisp natural English voice if available
+      const voices = window.speechSynthesis.getVoices();
+      const preferredVoice = voices.find(
+        (v) => v.lang.startsWith('en') && (v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('David') || v.name.includes('Zira'))
+      );
+      if (preferredVoice) utterance.voice = preferredVoice;
+
+      utterance.onstart = () => setIsTalking(true);
+      utterance.onend = () => setIsTalking(false);
+      utterance.onerror = () => setIsTalking(false);
+
+      window.speechSynthesis.speak(utterance);
+    }
+  };
+
+  // Canvas Oscilloscope Rendering Loop
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -56,7 +87,7 @@ export default function App() {
         ctx.stroke();
       }
 
-      // Dynamic Oscilloscope Sine Wave / Plasma Orb
+      // Dynamic Oscilloscope Waves
       const isBusy = isTalking || isThinking;
       const waveCount = isBusy ? 4 : 2;
       const baseAmp = isBusy ? 35 : 12;
@@ -92,7 +123,7 @@ export default function App() {
     return () => cancelAnimationFrame(animFrameRef.current);
   }, [isTalking, isThinking]);
 
-  // Send message to local LLM backend
+  // Send message to local Llama backend
   const handleSendMessage = async (textToSend) => {
     const prompt = textToSend || inputText;
     if (!prompt.trim() || isThinking) return;
@@ -113,50 +144,76 @@ export default function App() {
       if (res.ok) {
         const data = await res.json();
         const companionReply = data.response || "I am right here listening!";
-        
+
         setIsThinking(false);
-        setIsTalking(true);
 
         const companionMsg = { id: Date.now() + 1, sender: 'companion', text: companionReply };
         setMessages((prev) => [...prev, companionMsg]);
 
-        // Simulate voice playback duration matching response length
-        const talkDuration = Math.min(Math.max(companionReply.length * 40, 1500), 5000);
-        setTimeout(() => {
-          setIsTalking(false);
-        }, talkDuration);
+        // Speak the response out loud
+        speakText(companionReply);
       } else {
         throw new Error('API request failed');
       }
     } catch (err) {
       setIsThinking(false);
       setIsTalking(false);
+      const errorMsg = '[SYSTEM ALERT] Unable to reach backend server. Please verify FastAPI backend is running.';
       setMessages((prev) => [
         ...prev,
         {
           id: Date.now() + 2,
           sender: 'companion',
-          text: '[SYSTEM ALERT] Unable to reach backend server. Please verify FastAPI backend is running.',
+          text: errorMsg,
         },
       ]);
+      speakText("Warning: Unable to reach backend server.");
     }
   };
 
-  // Toggle Voice Input / Microphone
+  // Toggle Live Speech Microphone Input
   const toggleVoiceInteraction = () => {
-    if (!isTalking && !isThinking) {
-      setIsTalking(true);
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      // Fallback if browser doesn't support Web Speech API
       const simulatedPrompts = [
         "Tell me a short story about an AI companion in the year 2088.",
         "How are you feeling today, companion?",
         "Give me a quick tip for building hardware projects."
       ];
       const randomPrompt = simulatedPrompts[Math.floor(Math.random() * simulatedPrompts.length)];
+      handleSendMessage(randomPrompt);
+      return;
+    }
 
-      setTimeout(() => {
+    if (isTalking) {
+      window.speechSynthesis.cancel();
+      setIsTalking(false);
+      return;
+    }
+
+    if (!recognitionRef.current) {
+      const rec = new SpeechRecognition();
+      rec.continuous = false;
+      rec.interimResults = false;
+      rec.lang = 'en-US';
+
+      rec.onstart = () => setIsTalking(true);
+      rec.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
         setIsTalking(false);
-        handleSendMessage(randomPrompt);
-      }, 2000);
+        if (transcript) handleSendMessage(transcript);
+      };
+      rec.onerror = () => setIsTalking(false);
+      rec.onend = () => setIsTalking(false);
+      recognitionRef.current = rec;
+    }
+
+    try {
+      recognitionRef.current.start();
+    } catch (e) {
+      setIsTalking(false);
     }
   };
 
@@ -170,6 +227,17 @@ export default function App() {
         </div>
 
         <div className="retro-status-group">
+          <button
+            className="status-badge"
+            style={{ cursor: 'pointer' }}
+            onClick={() => {
+              setIsVoiceMuted(!isVoiceMuted);
+              if (!isVoiceMuted) window.speechSynthesis?.cancel();
+            }}
+          >
+            <span className={`led-dot ${!isVoiceMuted ? 'active' : 'busy'}`}></span>
+            <span>VOICE: {!isVoiceMuted ? 'SPEAKER ON' : 'MUTED'}</span>
+          </button>
           <div className="status-badge">
             <span className={`led-dot ${status.online ? 'active' : ''}`}></span>
             <span>SYSTEM: ONLINE</span>
@@ -195,7 +263,7 @@ export default function App() {
 
           <div className="core-avatar-display">
             <div className="ai-state-label">
-              {isThinking ? '⚡ THINKING...' : isTalking ? '🎙️ TALKING' : '🟢 READY'}
+              {isThinking ? '⚡ THINKING...' : isTalking ? '🎙️ SPEAKING / LISTENING' : '🟢 READY'}
             </div>
           </div>
 
@@ -203,7 +271,7 @@ export default function App() {
             className={`retro-talk-btn ${isTalking ? 'recording' : ''}`}
             onClick={toggleVoiceInteraction}
           >
-            <span>{isTalking ? '🎙️ LISTENING...' : '⚡ COMMUNICATE (VOICE)'}</span>
+            <span>{isTalking ? '⏹️ STOP / INTERRUPT' : '⚡ COMMUNICATE (VOICE)'}</span>
           </button>
         </section>
 
