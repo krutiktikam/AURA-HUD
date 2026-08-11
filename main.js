@@ -8,8 +8,8 @@ let currentState = 'compact'; // 'compact' | 'expanded'
 
 const COMPACT_WIDTH = 160;
 const COMPACT_HEIGHT = 44;
-const EXPANDED_WIDTH = 540;
-const EXPANDED_HEIGHT = 350;
+const EXPANDED_WIDTH = 640;
+const EXPANDED_HEIGHT = 400;
 const TOP_OFFSET = 10;
 
 function getWindowPosition(width) {

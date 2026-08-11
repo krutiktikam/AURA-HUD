@@ -223,19 +223,19 @@ html, body, #root {
 .text-error { color: var(--orange); }
 
 /* --------------------------------------------------
-   2. Expanded State (Horizontal OLED AI Card 540px × 350px)
+   2. Expanded State (Horizontal OLED AI Card 640px × 400px)
 -------------------------------------------------- */
 .island-horizontal-card {
-  width: 540px;
-  height: 350px;
+  width: 640px;
+  height: 400px;
   background: var(--oled-card-bg);
   border: 1px solid var(--oled-border);
   border-radius: 28px;
-  padding: 10px 12px;
+  padding: 12px 14px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.95), 0 0 30px rgba(56, 189, 248, 0.1);
+  gap: 10px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.95), 0 0 30px rgba(56, 189, 248, 0.12);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   overflow: hidden;
@@ -271,7 +271,7 @@ html, body, #root {
 
 .header-title {
   font-family: var(--font-mono);
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   font-weight: 800;
   color: var(--text-main);
   letter-spacing: 0.08em;
@@ -279,7 +279,7 @@ html, body, #root {
 
 .header-chip {
   font-family: var(--font-mono);
-  font-size: 0.6rem;
+  font-size: 0.62rem;
   font-weight: 700;
   background: rgba(56, 189, 248, 0.15);
   color: var(--cyan);
@@ -291,16 +291,16 @@ html, body, #root {
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .status-tag {
   font-family: var(--font-mono);
-  font-size: 0.62rem;
+  font-size: 0.65rem;
   font-weight: 800;
   color: var(--yellow);
   background: rgba(244, 185, 66, 0.12);
-  padding: 3px 8px;
+  padding: 3px 10px;
   border-radius: 8px;
 }
 
@@ -309,8 +309,8 @@ html, body, #root {
   color: var(--text-muted);
   border: none;
   border-radius: 50%;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   font-size: 0.75rem;
   cursor: pointer;
   display: flex;
@@ -327,8 +327,8 @@ html, body, #root {
 /* Main 2-Column Grid Layout */
 .horizontal-card-body {
   display: grid;
-  grid-template-columns: 240px 1fr;
-  gap: 10px;
+  grid-template-columns: 270px 1fr;
+  gap: 12px;
   flex: 1;
   min-height: 0;
   overflow: hidden;
@@ -338,13 +338,13 @@ html, body, #root {
 .metrics-left-column {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 .widget-card {
   background: var(--oled-widget-bg);
   border-radius: 16px;
-  padding: 8px 10px;
+  padding: 10px 12px;
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
@@ -352,7 +352,7 @@ html, body, #root {
 .noise-meter-widget {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
 .widget-header {
@@ -363,21 +363,21 @@ html, body, #root {
 
 .meter-val {
   font-family: var(--font-mono);
-  font-size: 1.05rem;
+  font-size: 1.1rem;
   font-weight: 800;
   color: var(--text-main);
 }
 
 .meter-val small {
-  font-size: 0.65rem;
+  font-size: 0.7rem;
   color: var(--text-muted);
 }
 
 .meter-tag {
   font-family: var(--font-mono);
-  font-size: 0.62rem;
+  font-size: 0.65rem;
   font-weight: 800;
-  padding: 2px 6px;
+  padding: 2px 8px;
   border-radius: 6px;
 }
 .meter-tag.normal { background: rgba(16, 185, 129, 0.15); color: var(--green); }
@@ -387,7 +387,7 @@ html, body, #root {
   display: flex;
   align-items: flex-end;
   gap: 3px;
-  height: 18px;
+  height: 20px;
 }
 
 .spec-bar {
@@ -411,12 +411,12 @@ html, body, #root {
 .stats-row-widget {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
 .activity-rings-container {
-  width: 48px;
-  height: 48px;
+  width: 52px;
+  height: 52px;
   flex-shrink: 0;
 }
 
@@ -430,7 +430,7 @@ html, body, #root {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 .pill-gauge-item {
@@ -441,24 +441,24 @@ html, body, #root {
 
 .gauge-label {
   font-family: var(--font-mono);
-  font-size: 0.65rem;
+  font-size: 0.68rem;
   font-weight: 800;
   color: var(--text-main);
 }
 
 .gauge-label small {
-  font-size: 0.55rem;
+  font-size: 0.58rem;
   color: var(--text-muted);
 }
 
 .capsule-dots-row {
   display: flex;
-  gap: 2px;
+  gap: 3px;
 }
 
 .cap-dot {
-  width: 7px;
-  height: 10px;
+  width: 8px;
+  height: 12px;
   border-radius: 3px;
 }
 
@@ -470,7 +470,7 @@ html, body, #root {
 .action-pills-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 6px;
+  gap: 8px;
 }
 
 .action-btn {
@@ -478,10 +478,10 @@ html, body, #root {
   border: 1px solid rgba(255, 255, 255, 0.08);
   color: var(--text-main);
   font-family: var(--font-mono);
-  font-size: 0.6rem;
+  font-size: 0.65rem;
   font-weight: 800;
-  padding: 6px 4px;
-  border-radius: 10px;
+  padding: 8px 6px;
+  border-radius: 12px;
   cursor: pointer;
   transition: all 0.15s ease;
   white-space: nowrap;
@@ -508,7 +508,7 @@ html, body, #root {
   background: var(--oled-widget-bg);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 18px;
-  padding: 8px;
+  padding: 10px;
   display: flex;
   flex-direction: column;
   flex: 1;
@@ -518,10 +518,10 @@ html, body, #root {
 
 .chat-widget-header {
   font-family: var(--font-mono);
-  font-size: 0.65rem;
+  font-size: 0.68rem;
   font-weight: 800;
   color: var(--cyan);
-  padding-bottom: 4px;
+  padding-bottom: 6px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   display: flex;
   justify-content: space-between;
@@ -536,10 +536,10 @@ html, body, #root {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 6px 2px;
+  padding: 8px 2px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
 .horizontal-chat-messages::-webkit-scrollbar {
@@ -551,11 +551,11 @@ html, body, #root {
 }
 
 .chat-bubble-oled {
-  padding: 6px 8px;
-  border-radius: 10px;
+  padding: 8px 10px;
+  border-radius: 12px;
   font-family: var(--font-mono);
-  font-size: 0.7rem;
-  line-height: 1.35;
+  font-size: 0.72rem;
+  line-height: 1.4;
   word-break: break-word;
 }
 
@@ -576,9 +576,9 @@ html, body, #root {
 }
 
 .bubble-sender {
-  font-size: 0.56rem;
+  font-size: 0.58rem;
   font-weight: 800;
-  margin-bottom: 2px;
+  margin-bottom: 3px;
 }
 .chat-bubble-oled.user .bubble-sender { color: var(--orange); }
 .chat-bubble-oled.companion .bubble-sender { color: var(--cyan); }
@@ -589,8 +589,8 @@ html, body, #root {
 
 .horizontal-chat-form {
   display: flex;
-  gap: 4px;
-  margin-top: 4px;
+  gap: 6px;
+  margin-top: 6px;
   flex-shrink: 0;
 }
 
@@ -598,11 +598,11 @@ html, body, #root {
   flex: 1;
   background: #161620;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 14px;
-  padding: 6px 10px;
+  border-radius: 16px;
+  padding: 8px 12px;
   color: #ffffff;
   font-family: var(--font-mono);
-  font-size: 0.7rem;
+  font-size: 0.72rem;
   outline: none;
 }
 
@@ -615,8 +615,8 @@ html, body, #root {
   color: #000000;
   border: none;
   border-radius: 50%;
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   font-size: 0.75rem;
   font-weight: 800;
   cursor: pointer;
@@ -633,13 +633,13 @@ html, body, #root {
 /* Telemetry Footer Strip */
 .card-footer-strip {
   background: var(--oled-widget-bg);
-  border-radius: 12px;
-  padding: 4px 10px;
+  border-radius: 14px;
+  padding: 6px 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   font-family: var(--font-mono);
-  font-size: 0.6rem;
+  font-size: 0.65rem;
   font-weight: 800;
   color: var(--text-muted);
   border: 1px solid rgba(255, 255, 255, 0.05);
