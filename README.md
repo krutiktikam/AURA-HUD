@@ -1,41 +1,42 @@
-# Hardware AI Companion Device
+# Hardware AI Companion Device (Dynamic Island Edition)
 
-A complete, production-ready software stack for a local hardware-based AI companion device with real-time voice interaction, code assistance, and a touchscreen dashboard.
+A complete, production-ready software stack for a local hardware-based AI companion device featuring an iPhone-style **Dynamic Island** desktop UI, real-time voice interaction, and an Okudagram retro-futuristic telemetry dashboard.
 
 ---
 
 ## 🌟 Features
 
-- **Offline Local LLM Engine**: Powered by Ollama (`llama3.2:1b` or customized GGUF models) with streaming responses.
-- **Speech-to-Text Pipeline**: High-speed offline transcription utilizing `faster-whisper`.
-- **Real-Time WebSockets**: Low-latency voice streaming and live hardware telemetry/log output.
-- **Touch-Optimized UI Dashboard**: Dark-mode industrial interface built with Vite + React featuring:
-  - 🎙️ **Voice Waveform Visualizer**: Live HTML5 canvas rendering audio input and playback state.
-  - 💻 **Code Assistant View**: Syntax-highlighted code output box with 1-tap clipboard copying.
-  - 📟 **Terminal Telemetry View**: Real-time console log viewer and interactive CLI prompt.
+- **Dynamic Island Desktop App (Electron)**:
+  - **Compact Pill State (120px × 40px)**: Sleek top-center floating pill showing minimal connection status, voice wave activity, and thinking spinner.
+  - **Expanded Dashboard State (400px × 320px)**: Expands into full Okudagram dashboard with rotating 3D orbital canvas, SVG segmented dial, vertical controls, and neural chat.
+  - **Global Hotkey & Tray**: Press `Ctrl+Shift+Y` to toggle island state, or click outside the window to automatically collapse to pill mode.
+- **Offline Local LLM Engine**: Powered by Ollama (`llama3.2:1b` or custom models) for private, zero-latency responses.
+- **Voice Interactivity**: Speech-to-Text (`faster-whisper`) and text-to-speech audio synthesis out loud.
+- **Real-Time WebSockets**: Low-latency audio streaming and system telemetry outputs.
 
 ---
 
-## 📂 Project Architecture
+## 📂 Clean Project Architecture
 
 ```text
 ai-companion-device/
+├── main.js                  # Electron main process (Dynamic Island IPC & window management)
+├── preload.js               # Secure IPC contextBridge preload script
+├── start-companion.bat      # 1-click automated batch launcher
+├── package.json             # Electron & root launcher scripts
 ├── backend/
-│   ├── __init__.py
 │   ├── main.py              # FastAPI server, REST & WebSocket endpoints
 │   ├── ai_engine.py         # Ollama LLM integration & streaming engine
 │   ├── voice_pipeline.py    # Speech-To-Text (Faster-Whisper) & TTS synth
 │   └── config.py            # Pydantic configuration & environment settings
 ├── ui/
-│   ├── App.jsx              # React touchscreen dashboard component
-│   ├── styles.css           # Industrial dark mode hardware styling
 │   ├── index.html           # HTML template
-│   ├── package.json         # Node.js dependencies
+│   ├── package.json         # React UI Node.js dependencies
 │   ├── vite.config.js       # Vite build & server config
 │   └── src/
 │       ├── main.jsx         # React DOM root entry point
-│       ├── App.jsx          # Embedded app source
-│       └── styles.css       # Embedded app styles
+│       ├── App.jsx          # Dynamic Island & Okudagram React UI component
+│       └── styles.css       # Glassmorphism & Okudagram styling
 ├── requirements.txt         # Python dependencies
 ├── .env.example             # Example environment variables template
 └── README.md                # Project documentation & execution guide
@@ -43,85 +44,30 @@ ai-companion-device/
 
 ---
 
-## 🛠️ Environment Configuration
+## 🚀 Quickstart Guide
 
-Create a `.env` file in the project root directory (or use default configuration):
+### 1-Click Automated Launch (Recommended)
+Simply double-click **`start-companion.bat`** (or run `.\start-companion.bat` in PowerShell).
 
-```env
-# Application Settings
-APP_NAME="Hardware AI Companion"
-DEBUG=true
-HOST="0.0.0.0"
-PORT=8000
+This automatically cleans up ports, launches Ollama, starts the FastAPI backend, initializes Vite, and opens the Dynamic Island Electron app at the top of your screen!
 
-# Audio Input / Output Device Indices
-AUDIO_INPUT_DEVICE_INDEX=0
-AUDIO_OUTPUT_DEVICE_INDEX=0
-SAMPLE_RATE=16000
-
-# Faster-Whisper Model Settings
-WHISPER_MODEL_SIZE="base"
-WHISPER_DEVICE="cpu"
-WHISPER_COMPUTE_TYPE="int8"
-
-# Ollama LLM Server
-OLLAMA_BASE_URL="http://localhost:11434"
-OLLAMA_MODEL="llama3.2:1b"
+### Manual Terminal Launch
+From the project root:
+```powershell
+# Single-command concurrent startup:
+npm run dev
 ```
 
 ---
 
-## 🚀 Step-by-Step Quickstart Guide
+## ⌨️ Controls & Shortcuts
 
-### 1. Prerequisites
-- **Python**: 3.10+
-- **Node.js**: 18+ & `npm`
-- **Ollama**: Download and install from [ollama.com](https://ollama.com)
-
-### 2. Prepare Local LLM Model (Ollama)
-Ensure Ollama is running and pull the lightweight Llama 3.2 1B model:
-```bash
-ollama serve
-ollama pull llama3.2:1b
-```
-
-### 3. Setup Python Backend Environment
-```bash
-# Create and activate virtual environment
-python -m venv venv
-
-#venv\Scripts\activate On Windows:
-
-# On Linux/macOS:
-source venv/bin/activate
-
-# Install Python requirements
-pip install -r requirements.txt
-```
-
-> **Note for PyAudio installation**:
-> - **Windows**: PyAudio wheel is included via `pip install pyaudio`.
-> - **Linux / Raspberry Pi**: Install portaudio header first: `sudo apt-get install portaudio19-dev python3-pyaudio`.
-
-### 4. Start the FastAPI Server
-From the root directory:
-```bash
-python -m backend.main
-# Or run with uvicorn reloader:
-uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
-```
-The REST API and WebSockets will be live at `http://localhost:8000`.
-- API Docs (Swagger UI): `http://localhost:8000/docs`
-- Health Endpoint: `http://localhost:8000/api/health`
-
-### 5. Launch the Touchscreen UI Dashboard
-Open a new terminal window:
-```bash
-cd ui
-npm install
-npm run dev
-```
-Open your browser or touchscreen display target at `http://localhost:3000`.
+| Action | Shortcut / Trigger |
+| :--- | :--- |
+| **Expand / Collapse Island** | Click compact pill OR press `Ctrl+Shift+Y` |
+| **Collapse to Pill** | Click outside the window (Blur event) OR click top-right `✕` button |
+| **System Tray Menu** | Right-click taskbar tray icon for Show/Hide & Toggle options |
+| **Voice Push-To-Talk** | Click `recon (voice)` button in expanded panel |
 
 ---
 
@@ -129,28 +75,13 @@ Open your browser or touchscreen display target at `http://localhost:3000`.
 
 | Endpoint | Type | Description |
 | :--- | :--- | :--- |
-| `GET /api/health` | REST | Checks system status, Ollama model availability & PyAudio devices |
+| `GET /api/health` | REST | Checks system status, Ollama model availability & audio devices |
 | `GET /api/config` | REST | Retrieves active hardware and audio settings |
 | `POST /api/chat` | REST | Non-streaming text chat endpoint (`{ "prompt": "..." }`) |
 | `POST /api/stt` | REST | Upload WAV audio file for Whisper transcription |
 | `POST /api/tts` | REST | Synthesize text to speech audio WAV stream |
 | `WS /ws/audio` | WebSocket | Low-latency audio stream, STT transcription, and LLM text tokens |
 | `WS /ws/terminal` | WebSocket | Real-time hardware telemetry and server logs stream |
-
----
-
-## 🧪 Testing & Verification
-
-1. **Test REST Chat Endpoint**:
-   ```bash
-   curl -X POST "http://localhost:8000/api/chat" \
-        -H "Content-Type: application/json" \
-        -d '{"prompt": "Hello AI Companion!"}'
-   ```
-2. **Verify Hardware Health**:
-   ```bash
-   curl "http://localhost:8000/api/health"
-   ```
 
 ---
 
