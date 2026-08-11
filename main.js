@@ -6,8 +6,9 @@ let win = null;
 let tray = null;
 let currentState = 'compact'; // 'compact' | 'expanded'
 
-const COMPACT_WIDTH = 140;
-const COMPACT_HEIGHT = 40;
+// Safe area bounding dimensions
+const COMPACT_WIDTH = 160;
+const COMPACT_HEIGHT = 60;
 const EXPANDED_WIDTH = 1113;
 const EXPANDED_HEIGHT = 385;
 const TOP_OFFSET = 10;
@@ -153,9 +154,12 @@ function setupIPC() {
     return currentState;
   });
 
-  ipcMain.handle('animation-complete', () => {
+  ipcMain.handle('animation-complete', (_event, targetState) => {
     if (win && !win.isDestroyed()) {
-      win.hide();
+      if (targetState === 'compact') {
+        const { x, y } = getWindowPosition(COMPACT_WIDTH);
+        win.setBounds({ x, y, width: COMPACT_WIDTH, height: COMPACT_HEIGHT }, true);
+      }
     }
     return true;
   });

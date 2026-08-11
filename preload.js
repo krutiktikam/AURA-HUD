@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getWindowState: () => ipcRenderer.invoke('get-window-state'),
   setWindowState: (state) => ipcRenderer.invoke('set-window-state', state), // 'compact' | 'expanded'
   toggleWindowState: () => ipcRenderer.invoke('toggle-window-state'),
+  animationComplete: (targetState) => ipcRenderer.invoke('animation-complete', targetState),
 
   // Event listeners for state changes from system tray or shortcuts
   onWindowStateChanged: (callback) => {

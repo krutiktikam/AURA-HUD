@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mic, Zap, RotateCw, VolumeX, Terminal, X, Circle } from 'lucide-react';
+import { Mic, Zap, RotateCw, VolumeX, Terminal, X } from 'lucide-react';
 import './styles.css';
 
 // Typewriter Effect Component for Neural Stream Output
-function TypewriterText({ text, speed = 25, onComplete }) {
+function TypewriterText({ text, speed = 20, onComplete }) {
   const [displayedText, setDisplayedText] = useState('');
 
   useEffect(() => {
@@ -69,7 +69,6 @@ function AnimatedEQMeter({ isTalking, isThinking, isSpeaking }) {
 
 export default function App() {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [isBackendOnline, setIsBackendOnline] = useState(true);
 
   // Activity States
   const [isTalking, setIsTalking] = useState(false);
@@ -108,18 +107,25 @@ export default function App() {
     }
   }, []);
 
-  const toggleExpanded = (expandedState) => {
-    setIsExpanded(expandedState);
+  // Rule 3: Expanding: Resize window to 1113x385 FIRST before expanding UI
+  const handleExpand = () => {
     if (window.electronAPI?.setWindowState) {
-      window.electronAPI.setWindowState(expandedState ? 'expanded' : 'compact');
+      window.electronAPI.setWindowState('expanded').then(() => {
+        setIsExpanded(true);
+      });
+    } else {
+      setIsExpanded(true);
     }
   };
 
-  // Close with exit animation and IPC notification
-  const handleClose = () => {
+  // Rule 3: Collapsing: Run Framer Motion shrink animation FIRST, then resize window to 160x60
+  const handleCollapse = () => {
     setIsExpanded(false);
-    if (window.electronAPI?.setWindowState) {
-      window.electronAPI.setWindowState('compact');
+  };
+
+  const handleAnimationComplete = () => {
+    if (!isExpanded && window.electronAPI?.animationComplete) {
+      window.electronAPI.animationComplete('compact');
     }
   };
 
@@ -225,19 +231,22 @@ export default function App() {
   };
 
   return (
-    <div className="w-full h-full flex items-start justify-center pt-2">
+    /* RULE 2: Root Container: Exactly window size, completely bg-transparent, centered flexbox */
+    <div className="w-full h-full flex items-center justify-center bg-transparent select-none p-2 overflow-hidden">
       <AnimatePresence mode="wait">
         {!isExpanded ? (
           /* ============================================================
-             OBJECTIVE 2: Collapsed "Pill" State (140px × 40px)
+             RULE 2: Collapsed "Pill" State (w-[140px] h-[40px])
+             Centered in safe area bounding box (160x60) with no clipping
              ============================================================ */
           <motion.div
             key="collapsed-pill"
             layoutId="dynamic-island"
-            onClick={() => toggleExpanded(true)}
+            onClick={handleExpand}
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.8 }}
+            onAnimationComplete={handleAnimationComplete}
             transition={{ type: 'spring', stiffness: 300, damping: 25 }}
             className="w-[140px] h-[40px] rounded-full bg-[#0d1117]/90 backdrop-blur-md border border-teal-500/30 shadow-lg shadow-teal-500/10 cursor-pointer flex items-center justify-center gap-2 px-3 hover:border-teal-400/60 hover:shadow-teal-500/20 transition-all select-none"
             title="Click to expand AI Companion"
@@ -253,7 +262,7 @@ export default function App() {
           </motion.div>
         ) : (
           /* ============================================================
-             OBJECTIVE 3: Expanded "Landscape Dashboard" (1113px × 385px)
+             Expanded "Landscape Dashboard" (1113px × 385px)
              ============================================================ */
           <motion.div
             key="expanded-dashboard"
@@ -261,6 +270,7 @@ export default function App() {
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9 }}
+            onAnimationComplete={handleAnimationComplete}
             transition={{ type: 'spring', stiffness: 300, damping: 25 }}
             className="w-[1113px] h-[385px] bg-[#0d1117]/95 backdrop-blur-xl border border-teal-500/20 rounded-2xl shadow-2xl overflow-hidden text-slate-100 font-sans flex flex-col justify-between select-none"
           >
@@ -280,7 +290,7 @@ export default function App() {
                   {isThinking ? 'COMPUTING' : isTalking ? 'LISTENING' : isSpeakingTTS ? 'TRANSMITTING' : 'STEADY'}
                 </span>
                 <button
-                  onClick={handleClose}
+                  onClick={handleCollapse}
                   className="w-6 h-6 rounded-full bg-[#21262d] hover:bg-rose-500/80 hover:text-white text-slate-400 flex items-center justify-center transition-all cursor-pointer"
                   title="Close Dashboard"
                 >
