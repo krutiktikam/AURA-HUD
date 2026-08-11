@@ -6,10 +6,10 @@ let win = null;
 let tray = null;
 let currentState = 'compact'; // 'compact' | 'expanded'
 
-const COMPACT_WIDTH = 140;
-const COMPACT_HEIGHT = 40;
-const EXPANDED_WIDTH = 360;
-const EXPANDED_HEIGHT = 540;
+const COMPACT_WIDTH = 160;
+const COMPACT_HEIGHT = 44;
+const EXPANDED_WIDTH = 540;
+const EXPANDED_HEIGHT = 350;
 const TOP_OFFSET = 10;
 
 function getWindowPosition(width) {
@@ -119,7 +119,7 @@ function createTray() {
     }
   ]);
 
-  tray.setToolTip('AI Companion - Vertical OLED Dynamic Island');
+  tray.setToolTip('AI Companion - Dynamic Island');
   tray.setContextMenu(contextMenu);
 
   tray.on('click', () => {

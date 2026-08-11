@@ -20,9 +20,9 @@ export default function App() {
   const [isThinking, setIsThinking] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
 
-  // Dynamic Live Metrics (matching reference widgets)
-  const [cycles, setCycles] = useState(13415);
-  const [audioDb, setAudioDb] = useState(45);
+  // Dynamic Live Metrics (matching widgets)
+  const [cycles, setCycles] = useState(13534);
+  const [audioDb, setAudioDb] = useState(49);
   const [ramUsage, setRamUsage] = useState(1.32);
   const [tokensPerSec, setTokensPerSec] = useState(46);
 
@@ -95,15 +95,15 @@ export default function App() {
     const timer = setInterval(() => {
       setCycles((c) => c + 1);
       if (isTalking || isSpeakingTTS) {
-        setAudioDb(85 + Math.floor(Math.random() * 20));
+        setAudioDb(82 + Math.floor(Math.random() * 18));
         setRamUsage(1.48);
         setTokensPerSec(58);
       } else if (isThinking) {
-        setAudioDb(60 + Math.floor(Math.random() * 15));
+        setAudioDb(62 + Math.floor(Math.random() * 12));
         setRamUsage(1.65);
         setTokensPerSec(62);
       } else {
-        setAudioDb(42 + Math.floor(Math.random() * 8));
+        setAudioDb(46 + Math.floor(Math.random() * 6));
         setRamUsage(1.32);
         setTokensPerSec(46);
       }
@@ -220,7 +220,7 @@ export default function App() {
     }
   };
 
-  // Render Compact State (Dynamic Island Pill)
+  // Render Compact State (Animated Dynamic Island Pill)
   if (islandState === 'compact') {
     return (
       <div
@@ -268,9 +268,9 @@ export default function App() {
     );
   }
 
-  // Render Expanded State (Vertical OLED Dynamic Island AI Card)
+  // Render Expanded State (Horizontal Animated Dynamic Island Card 540px × 350px)
   return (
-    <div className="island-vertical-card">
+    <div className="island-horizontal-card animate-expand">
       {/* Top Bar Header */}
       <header className="card-header">
         <div className="header-badge">
@@ -278,156 +278,162 @@ export default function App() {
           <span className="header-title">AI COMPANION</span>
           <span className="header-chip">LLM 1B</span>
         </div>
-        <button
-          className="card-close-btn"
-          onClick={(e) => {
-            e.stopPropagation();
-            setExpandedState(false);
-          }}
-          title="Collapse to Pill"
-        >
-          ✕
-        </button>
+        <div className="header-actions">
+          <span className="status-tag">
+            {isThinking ? 'COMPUTING' : isTalking ? 'LISTENING' : isSpeakingTTS ? 'SPEAKING' : 'STEADY'}
+          </span>
+          <button
+            className="card-close-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              setExpandedState(false);
+            }}
+            title="Collapse to Pill"
+          >
+            ✕
+          </button>
+        </div>
       </header>
 
-      {/* Widget 1: Audio Spectrum & Noise Meter (Reference Image 2 Top-Left) */}
-      <section className="widget-card noise-meter-widget">
-        <div className="widget-header">
-          <span className="meter-val">{audioDb} <small>dB</small></span>
-          <span className={`meter-tag ${audioDb > 85 ? 'loud' : 'normal'}`}>
-            {audioDb > 85 ? 'ACTIVE ⚠️' : 'NORMAL'}
-          </span>
-        </div>
-        <div className="spectrum-bars-row">
-          {[...Array(16)].map((_, i) => {
-            const activeCount = Math.floor((audioDb / 100) * 16);
-            const isActive = i < activeCount;
-            let barColorClass = 'green';
-            if (i >= 10) barColorClass = 'red';
-            else if (i >= 6) barColorClass = 'yellow';
-
-            return (
-              <span
-                key={i}
-                className={`spec-bar ${barColorClass} ${isActive ? 'active' : ''}`}
-              />
-            );
-          })}
-        </div>
-      </section>
-
-      {/* Widget 2: Concentric Activity Rings & Memory Pill Gauges (Reference Image 2) */}
-      <section className="widget-card stats-row-widget">
-        {/* Concentric Rings */}
-        <div className="activity-rings-container">
-          <svg viewBox="0 0 60 60" className="rings-svg">
-            {/* Outer Ring: Cyan LLM Load */}
-            <circle cx="30" cy="30" r="25" fill="none" stroke="#1e293b" strokeWidth="4" />
-            <circle
-              cx="30" cy="30" r="25" fill="none" stroke="#38bdf8" strokeWidth="4"
-              strokeDasharray="157" strokeDashoffset={157 - (157 * 0.65)} strokeLinecap="round"
-            />
-            {/* Middle Ring: Pink STT Rate */}
-            <circle cx="30" cy="30" r="18" fill="none" stroke="#1e293b" strokeWidth="4" />
-            <circle
-              cx="30" cy="30" r="18" fill="none" stroke="#ec4899" strokeWidth="4"
-              strokeDasharray="113" strokeDashoffset={113 - (113 * 0.88)} strokeLinecap="round"
-            />
-            {/* Inner Ring: Yellow Audio Sample */}
-            <circle cx="30" cy="30" r="11" fill="none" stroke="#1e293b" strokeWidth="4" />
-            <circle
-              cx="30" cy="30" r="11" fill="none" stroke="#f4b942" strokeWidth="4"
-              strokeDasharray="69" strokeDashoffset={69 - (69 * 0.45)} strokeLinecap="round"
-            />
-          </svg>
-        </div>
-
-        {/* Memory & Token Gauges */}
-        <div className="metrics-col">
-          <div className="pill-gauge-item">
-            <span className="gauge-label">{ramUsage} <small>OF 2.0 GB</small></span>
-            <div className="capsule-dots-row">
-              <span className="cap-dot fill-cyan" />
-              <span className="cap-dot fill-cyan" />
-              <span className="cap-dot fill-cyan" />
-              <span className="cap-dot fill-cyan" />
-              <span className="cap-dot fill-empty" />
+      {/* Main 2-Column Grid */}
+      <div className="horizontal-card-body">
+        {/* Left Column: Metrics & Control Widgets */}
+        <div className="metrics-left-column">
+          {/* Noise Meter Widget */}
+          <section className="widget-card noise-meter-widget">
+            <div className="widget-header">
+              <span className="meter-val">{audioDb} <small>dB</small></span>
+              <span className={`meter-tag ${audioDb > 80 ? 'loud' : 'normal'}`}>
+                {audioDb > 80 ? 'ACTIVE ⚠️' : 'NORMAL'}
+              </span>
             </div>
+            <div className="spectrum-bars-row">
+              {[...Array(14)].map((_, i) => {
+                const activeCount = Math.floor((audioDb / 100) * 14);
+                const isActive = i < activeCount;
+                let barColorClass = 'green';
+                if (i >= 9) barColorClass = 'red';
+                else if (i >= 5) barColorClass = 'yellow';
+
+                return (
+                  <span
+                    key={i}
+                    className={`spec-bar ${barColorClass} ${isActive ? 'active' : ''}`}
+                  />
+                );
+              })}
+            </div>
+          </section>
+
+          {/* Activity Rings & Gauges Widget */}
+          <section className="widget-card stats-row-widget">
+            <div className="activity-rings-container">
+              <svg viewBox="0 0 60 60" className="rings-svg">
+                <circle cx="30" cy="30" r="25" fill="none" stroke="#1e293b" strokeWidth="4" />
+                <circle
+                  cx="30" cy="30" r="25" fill="none" stroke="#38bdf8" strokeWidth="4"
+                  strokeDasharray="157" strokeDashoffset={157 - (157 * 0.65)} strokeLinecap="round"
+                />
+                <circle cx="30" cy="30" r="18" fill="none" stroke="#1e293b" strokeWidth="4" />
+                <circle
+                  cx="30" cy="30" r="18" fill="none" stroke="#ec4899" strokeWidth="4"
+                  strokeDasharray="113" strokeDashoffset={113 - (113 * 0.88)} strokeLinecap="round"
+                />
+                <circle cx="30" cy="30" r="11" fill="none" stroke="#1e293b" strokeWidth="4" />
+                <circle
+                  cx="30" cy="30" r="11" fill="none" stroke="#f4b942" strokeWidth="4"
+                  strokeDasharray="69" strokeDashoffset={69 - (69 * 0.45)} strokeLinecap="round"
+                />
+              </svg>
+            </div>
+
+            <div className="metrics-col">
+              <div className="pill-gauge-item">
+                <span className="gauge-label">{ramUsage} <small>OF 2.0 GB</small></span>
+                <div className="capsule-dots-row">
+                  <span className="cap-dot fill-cyan" />
+                  <span className="cap-dot fill-cyan" />
+                  <span className="cap-dot fill-cyan" />
+                  <span className="cap-dot fill-cyan" />
+                  <span className="cap-dot fill-empty" />
+                </div>
+              </div>
+
+              <div className="pill-gauge-item">
+                <span className="gauge-label">{tokensPerSec} <small>TOK/SEC</small></span>
+                <div className="capsule-dots-row">
+                  <span className="cap-dot fill-pink" />
+                  <span className="cap-dot fill-pink" />
+                  <span className="cap-dot fill-pink" />
+                  <span className="cap-dot fill-empty" />
+                  <span className="cap-dot fill-empty" />
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Quick Action Pill Buttons */}
+          <div className="action-pills-grid">
+            <button className={`action-btn pink ${isTalking ? 'active' : ''}`} onClick={toggleVoice}>
+              🎙️ RECON (VOICE)
+            </button>
+            <button className="action-btn orange" onClick={() => handleSend()}>
+              ⚡ ENGAGE
+            </button>
+            <button className="action-btn" onClick={() => handleSend('Regenerate system response.')}>
+              🔄 REGEN
+            </button>
+            <button className="action-btn" onClick={() => setIsMuted(!isMuted)}>
+              {isMuted ? '🔈 UNMUTE' : '🔇 MUTE'}
+            </button>
+          </div>
+        </div>
+
+        {/* Right Column: Neural Chat Stream */}
+        <section className="horizontal-chat-widget">
+          <div className="chat-widget-header">
+            <span>RIGEL NEURAL STREAM</span>
+            <span className="header-sub">ø13_49</span>
           </div>
 
-          <div className="pill-gauge-item">
-            <span className="gauge-label">{tokensPerSec} <small>TOK/SEC</small></span>
-            <div className="capsule-dots-row">
-              <span className="cap-dot fill-pink" />
-              <span className="cap-dot fill-pink" />
-              <span className="cap-dot fill-pink" />
-              <span className="cap-dot fill-empty" />
-              <span className="cap-dot fill-empty" />
-            </div>
+          <div className="horizontal-chat-messages">
+            {messages.map((m) => (
+              <div key={m.id} className={`chat-bubble-oled ${m.sender}`}>
+                <div className="bubble-sender">{m.sender === 'user' ? '► USER' : '❖ COMPANION'}</div>
+                <div className="bubble-text">{m.text}</div>
+              </div>
+            ))}
+            {isThinking && (
+              <div className="chat-bubble-oled companion">
+                <div className="bubble-sender">❖ COMPANION</div>
+                <div className="bubble-text thinking-dots">⚡ Processing neural output...</div>
+              </div>
+            )}
+            <div ref={chatEndRef} />
           </div>
-        </div>
-      </section>
 
-      {/* Widget 3: Quick Tactile Action Pills */}
-      <div className="action-pills-row">
-        <button className={`action-btn pink ${isTalking ? 'active' : ''}`} onClick={toggleVoice}>
-          🎙️ RECON (VOICE)
-        </button>
-        <button className="action-btn orange" onClick={() => handleSend()}>
-          ⚡ ENGAGE
-        </button>
-        <button className="action-btn" onClick={() => handleSend('Regenerate system response.')}>
-          🔄 REGEN
-        </button>
-        <button className="action-btn" onClick={() => setIsMuted(!isMuted)}>
-          {isMuted ? '🔈 UNMUTE' : '🔇 MUTE'}
-        </button>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSend();
+            }}
+            className="horizontal-chat-form"
+          >
+            <input
+              type="text"
+              className="horizontal-chat-input"
+              placeholder="Ask your AI companion..."
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+            />
+            <button type="submit" className="horizontal-chat-submit">
+              ►
+            </button>
+          </form>
+        </section>
       </div>
 
-      {/* Widget 4: Vertical Neural Chat Box */}
-      <section className="vertical-chat-widget">
-        <div className="chat-widget-header">
-          <span>RIGEL NEURAL STREAM</span>
-          <span className="header-sub">ø13_49</span>
-        </div>
-
-        <div className="vertical-chat-messages">
-          {messages.map((m) => (
-            <div key={m.id} className={`chat-bubble-oled ${m.sender}`}>
-              <div className="bubble-sender">{m.sender === 'user' ? '► USER' : '❖ COMPANION'}</div>
-              <div className="bubble-text">{m.text}</div>
-            </div>
-          ))}
-          {isThinking && (
-            <div className="chat-bubble-oled companion">
-              <div className="bubble-sender">❖ COMPANION</div>
-              <div className="bubble-text thinking-dots">⚡ Processing neural output...</div>
-            </div>
-          )}
-          <div ref={chatEndRef} />
-        </div>
-
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            handleSend();
-          }}
-          className="vertical-chat-form"
-        >
-          <input
-            type="text"
-            className="vertical-chat-input"
-            placeholder="Ask your AI companion..."
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-          />
-          <button type="submit" className="vertical-chat-submit">
-            ►
-          </button>
-        </form>
-      </section>
-
-      {/* Widget 5: Telemetry Footer Strip (Reference Image 2) */}
+      {/* Footer Telemetry Strip */}
       <footer className="card-footer-strip">
         <div className="footer-item">CYCLES <span>{cycles.toLocaleString()}</span></div>
         <div className="footer-item">SPECTRUM <span>136 AQI</span></div>

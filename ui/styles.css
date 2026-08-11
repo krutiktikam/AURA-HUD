@@ -1,4 +1,4 @@
-/* OLED Dynamic Island Vertical AI Card Theme */
+/* OLED Dynamic Island Horizontal Card & Animated Transitions */
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500;700;800&family=Inter:wght@400;600;700;800&display=swap');
 
 :root {
@@ -58,32 +58,51 @@ html, body, #root {
   50% { height: 16px; }
 }
 
+@keyframes expandIsland {
+  0% {
+    opacity: 0;
+    transform: scale(0.4) translateY(-20px);
+    filter: blur(8px);
+  }
+  65% {
+    opacity: 1;
+    transform: scale(1.03) translateY(2px);
+    filter: blur(0px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    filter: blur(0px);
+  }
+}
+
 /* --------------------------------------------------
-   1. Dynamic Island Compact Pill (140px × 40px)
+   1. Dynamic Island Compact Pill (160px × 44px)
 -------------------------------------------------- */
 .island-pill {
-  width: 140px;
-  height: 40px;
-  background: rgba(0, 0, 0, 0.88);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 20px;
-  padding: 0 14px;
+  width: 160px;
+  height: 44px;
+  background: rgba(0, 0, 0, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 22px;
+  padding: 0 16px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
   cursor: pointer;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
   margin: 0 auto;
 }
 
 .island-pill:hover {
-  background: rgba(15, 15, 20, 0.95);
-  transform: scale(1.03);
-  box-shadow: 0 10px 36px rgba(0, 0, 0, 0.8), 0 0 16px rgba(56, 189, 248, 0.2);
+  background: rgba(15, 15, 22, 0.95);
+  transform: scale(1.04);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.85), 0 0 20px rgba(56, 189, 248, 0.35);
+  border-color: rgba(56, 189, 248, 0.5);
 }
 
 .pill-text {
@@ -97,7 +116,7 @@ html, body, #root {
 
 /* Variant 1: Idle */
 .island-pill.idle {
-  border-color: rgba(16, 185, 129, 0.3);
+  border-color: rgba(16, 185, 129, 0.35);
 }
 
 .pill-dot.idle-dot {
@@ -112,7 +131,7 @@ html, body, #root {
 
 /* Variant 2: Listening */
 .island-pill.listening {
-  border-color: rgba(239, 71, 90, 0.4);
+  border-color: rgba(239, 71, 90, 0.45);
   background: rgba(25, 10, 15, 0.92);
 }
 
@@ -140,7 +159,7 @@ html, body, #root {
 
 /* Variant 3: Thinking */
 .island-pill.thinking {
-  border-color: rgba(244, 185, 66, 0.4);
+  border-color: rgba(244, 185, 66, 0.45);
   background: rgba(25, 20, 10, 0.92);
 }
 
@@ -158,7 +177,7 @@ html, body, #root {
 
 /* Variant 4: Speaking */
 .island-pill.speaking {
-  border-color: rgba(56, 189, 248, 0.4);
+  border-color: rgba(56, 189, 248, 0.45);
   background: rgba(10, 20, 30, 0.92);
 }
 
@@ -204,24 +223,27 @@ html, body, #root {
 .text-error { color: var(--orange); }
 
 /* --------------------------------------------------
-   2. Expanded State (Vertical OLED AI Card 360px × 540px)
+   2. Expanded State (Horizontal OLED AI Card 540px × 350px)
 -------------------------------------------------- */
-.island-vertical-card {
-  width: 360px;
-  height: 540px;
+.island-horizontal-card {
+  width: 540px;
+  height: 350px;
   background: var(--oled-card-bg);
   border: 1px solid var(--oled-border);
-  border-radius: 32px;
-  padding: 12px;
+  border-radius: 28px;
+  padding: 10px 12px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.9), 0 0 30px rgba(56, 189, 248, 0.08);
+  gap: 8px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.95), 0 0 30px rgba(56, 189, 248, 0.1);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
   margin: 0 auto;
+}
+
+.island-horizontal-card.animate-expand {
+  animation: expandIsland 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
 
 /* Header */
@@ -230,6 +252,7 @@ html, body, #root {
   align-items: center;
   justify-content: space-between;
   padding: 2px 4px;
+  flex-shrink: 0;
 }
 
 .header-badge {
@@ -265,6 +288,22 @@ html, body, #root {
   border: 1px solid rgba(56, 189, 248, 0.3);
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-tag {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 800;
+  color: var(--yellow);
+  background: rgba(244, 185, 66, 0.12);
+  padding: 3px 8px;
+  border-radius: 8px;
+}
+
 .card-close-btn {
   background: #1e1e24;
   color: var(--text-muted);
@@ -285,19 +324,35 @@ html, body, #root {
   color: #ffffff;
 }
 
-/* Common Widget Card */
-.widget-card {
-  background: var(--oled-widget-bg);
-  border-radius: 18px;
-  padding: 10px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+/* Main 2-Column Grid Layout */
+.horizontal-card-body {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 10px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
-/* Widget 1: Noise Meter & Spectrum Bar (Ref Image 2) */
-.noise-meter-widget {
+/* Left Column: Metrics & Control Widgets */
+.metrics-left-column {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.widget-card {
+  background: var(--oled-widget-bg);
+  border-radius: 16px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Noise Meter Widget */
+.noise-meter-widget {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .widget-header {
@@ -308,22 +363,22 @@ html, body, #root {
 
 .meter-val {
   font-family: var(--font-mono);
-  font-size: 1.1rem;
+  font-size: 1.05rem;
   font-weight: 800;
   color: var(--text-main);
 }
 
 .meter-val small {
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   color: var(--text-muted);
 }
 
 .meter-tag {
   font-family: var(--font-mono);
-  font-size: 0.65rem;
+  font-size: 0.62rem;
   font-weight: 800;
-  padding: 2px 8px;
-  border-radius: 8px;
+  padding: 2px 6px;
+  border-radius: 6px;
 }
 .meter-tag.normal { background: rgba(16, 185, 129, 0.15); color: var(--green); }
 .meter-tag.loud { background: rgba(239, 71, 90, 0.15); color: var(--pink); }
@@ -332,7 +387,7 @@ html, body, #root {
   display: flex;
   align-items: flex-end;
   gap: 3px;
-  height: 22px;
+  height: 18px;
 }
 
 .spec-bar {
@@ -352,16 +407,16 @@ html, body, #root {
   box-shadow: 0 0 6px currentColor;
 }
 
-/* Widget 2: Concentric Activity Rings & Memory Pill Gauges (Ref Image 2) */
+/* Activity Rings & Gauges Widget */
 .stats-row-widget {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
 }
 
 .activity-rings-container {
-  width: 54px;
-  height: 54px;
+  width: 48px;
+  height: 48px;
   flex-shrink: 0;
 }
 
@@ -375,7 +430,7 @@ html, body, #root {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .pill-gauge-item {
@@ -386,50 +441,51 @@ html, body, #root {
 
 .gauge-label {
   font-family: var(--font-mono);
-  font-size: 0.68rem;
+  font-size: 0.65rem;
   font-weight: 800;
   color: var(--text-main);
 }
 
 .gauge-label small {
-  font-size: 0.58rem;
+  font-size: 0.55rem;
   color: var(--text-muted);
 }
 
 .capsule-dots-row {
   display: flex;
-  gap: 3px;
+  gap: 2px;
 }
 
 .cap-dot {
-  width: 8px;
-  height: 12px;
-  border-radius: 4px;
+  width: 7px;
+  height: 10px;
+  border-radius: 3px;
 }
 
 .cap-dot.fill-cyan { background: var(--cyan); box-shadow: 0 0 4px var(--cyan); }
 .cap-dot.fill-pink { background: var(--pink-bright); box-shadow: 0 0 4px var(--pink-bright); }
 .cap-dot.fill-empty { background: #262630; }
 
-/* Widget 3: Quick Tactile Action Pills */
-.action-pills-row {
-  display: flex;
+/* Quick Action Pill Grid */
+.action-pills-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 6px;
 }
 
 .action-btn {
-  flex: 1;
   background: #1c1c24;
   border: 1px solid rgba(255, 255, 255, 0.08);
   color: var(--text-main);
   font-family: var(--font-mono);
-  font-size: 0.62rem;
+  font-size: 0.6rem;
   font-weight: 800;
-  padding: 8px 4px;
-  border-radius: 12px;
+  padding: 6px 4px;
+  border-radius: 10px;
   cursor: pointer;
   transition: all 0.15s ease;
   white-space: nowrap;
+  text-align: center;
 }
 
 .action-btn:hover {
@@ -447,12 +503,12 @@ html, body, #root {
   border-color: rgba(247, 146, 86, 0.3);
 }
 
-/* Widget 4: Vertical Neural Chat */
-.vertical-chat-widget {
-  background: var(--oled-card-bg);
+/* Right Column: Neural Chat Widget */
+.horizontal-chat-widget {
+  background: var(--oled-widget-bg);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 20px;
-  padding: 10px;
+  border-radius: 18px;
+  padding: 8px;
   display: flex;
   flex-direction: column;
   flex: 1;
@@ -465,7 +521,7 @@ html, body, #root {
   font-size: 0.65rem;
   font-weight: 800;
   color: var(--cyan);
-  padding-bottom: 6px;
+  padding-bottom: 4px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   display: flex;
   justify-content: space-between;
@@ -476,30 +532,30 @@ html, body, #root {
   color: var(--text-muted);
 }
 
-.vertical-chat-messages {
+.horizontal-chat-messages {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 8px 2px;
+  padding: 6px 2px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
-.vertical-chat-messages::-webkit-scrollbar {
+.horizontal-chat-messages::-webkit-scrollbar {
   width: 4px;
 }
-.vertical-chat-messages::-webkit-scrollbar-thumb {
+.horizontal-chat-messages::-webkit-scrollbar-thumb {
   background: #2a2a36;
   border-radius: 2px;
 }
 
 .chat-bubble-oled {
-  padding: 8px 10px;
-  border-radius: 12px;
+  padding: 6px 8px;
+  border-radius: 10px;
   font-family: var(--font-mono);
-  font-size: 0.72rem;
-  line-height: 1.4;
+  font-size: 0.7rem;
+  line-height: 1.35;
   word-break: break-word;
 }
 
@@ -520,9 +576,9 @@ html, body, #root {
 }
 
 .bubble-sender {
-  font-size: 0.58rem;
+  font-size: 0.56rem;
   font-weight: 800;
-  margin-bottom: 3px;
+  margin-bottom: 2px;
 }
 .chat-bubble-oled.user .bubble-sender { color: var(--orange); }
 .chat-bubble-oled.companion .bubble-sender { color: var(--cyan); }
@@ -531,36 +587,36 @@ html, body, #root {
   color: var(--yellow);
 }
 
-.vertical-chat-form {
+.horizontal-chat-form {
   display: flex;
-  gap: 6px;
-  margin-top: 6px;
+  gap: 4px;
+  margin-top: 4px;
   flex-shrink: 0;
 }
 
-.vertical-chat-input {
+.horizontal-chat-input {
   flex: 1;
   background: #161620;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 16px;
-  padding: 8px 12px;
+  border-radius: 14px;
+  padding: 6px 10px;
   color: #ffffff;
   font-family: var(--font-mono);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   outline: none;
 }
 
-.vertical-chat-input:focus {
+.horizontal-chat-input:focus {
   border-color: var(--cyan);
 }
 
-.vertical-chat-submit {
+.horizontal-chat-submit {
   background: var(--cyan);
   color: #000000;
   border: none;
   border-radius: 50%;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   font-size: 0.75rem;
   font-weight: 800;
   cursor: pointer;
@@ -570,15 +626,15 @@ html, body, #root {
   transition: transform 0.15s ease;
 }
 
-.vertical-chat-submit:hover {
+.horizontal-chat-submit:hover {
   transform: scale(1.08);
 }
 
-/* Widget 5: Telemetry Footer Strip (Ref Image 2) */
+/* Telemetry Footer Strip */
 .card-footer-strip {
   background: var(--oled-widget-bg);
-  border-radius: 14px;
-  padding: 6px 12px;
+  border-radius: 12px;
+  padding: 4px 10px;
   display: flex;
   align-items: center;
   justify-content: space-between;
