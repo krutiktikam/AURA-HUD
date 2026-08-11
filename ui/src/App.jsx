@@ -11,7 +11,7 @@ export default function App() {
     {
       id: 1,
       sender: 'companion',
-      text: 'OKUDAGRAM SYSTEM INITIALIZED: Rigel station core active. Voice and neural interface standby.',
+      text: 'AI COMPANION ONLINE: Neural core active. Voice & telemetry systems ready.',
     },
   ]);
 
@@ -20,15 +20,13 @@ export default function App() {
   const [isThinking, setIsThinking] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
 
-  // Dynamic Live Metrics
-  const [cycles, setCycles] = useState(13386);
-  const [powerMetric, setPowerMetric] = useState(1636);
-  const [technoSig, setTechnoSig] = useState(16);
-  const [olivinePpm, setOlivinePpm] = useState(76);
+  // Dynamic Live Metrics (matching reference widgets)
+  const [cycles, setCycles] = useState(13415);
+  const [audioDb, setAudioDb] = useState(45);
+  const [ramUsage, setRamUsage] = useState(1.32);
+  const [tokensPerSec, setTokensPerSec] = useState(46);
 
-  const canvasRef = useRef(null);
   const chatEndRef = useRef(null);
-  const animFrameRef = useRef(null);
   const recognitionRef = useRef(null);
 
   // IPC listener for Electron window state
@@ -57,7 +55,7 @@ export default function App() {
     }
   };
 
-  // Derive compact pill variant from application activity state
+  // Derive compact pill variant from activity state
   useEffect(() => {
     if (!isBackendOnline) {
       setCompactVariant('error');
@@ -92,20 +90,26 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
-  // Increment dynamic cycles & power metrics for responsive feel
+  // Increment metrics for responsive audio spectrum and system activity
   useEffect(() => {
     const timer = setInterval(() => {
       setCycles((c) => c + 1);
       if (isTalking || isSpeakingTTS) {
-        setPowerMetric(1600 + Math.floor(Math.random() * 120));
-        setOlivinePpm(70 + Math.floor(Math.random() * 25));
+        setAudioDb(85 + Math.floor(Math.random() * 20));
+        setRamUsage(1.48);
+        setTokensPerSec(58);
+      } else if (isThinking) {
+        setAudioDb(60 + Math.floor(Math.random() * 15));
+        setRamUsage(1.65);
+        setTokensPerSec(62);
       } else {
-        setPowerMetric(1636);
-        setOlivinePpm(76);
+        setAudioDb(42 + Math.floor(Math.random() * 8));
+        setRamUsage(1.32);
+        setTokensPerSec(46);
       }
     }, 1000);
     return () => clearInterval(timer);
-  }, [isTalking, isSpeakingTTS]);
+  }, [isTalking, isSpeakingTTS, isThinking]);
 
   // Auto-scroll chat when expanded
   useEffect(() => {
@@ -122,7 +126,7 @@ export default function App() {
       const clean = text.replace(/[\*\_#\`]/g, '');
       const utterance = new SpeechSynthesisUtterance(clean);
       utterance.rate = 1.0;
-      utterance.pitch = 0.92;
+      utterance.pitch = 0.95;
 
       const voices = window.speechSynthesis.getVoices();
       const preferred = voices.find(
@@ -137,79 +141,6 @@ export default function App() {
       window.speechSynthesis.speak(utterance);
     }
   };
-
-  // Orbital Canvas Visualizer renderer when expanded
-  useEffect(() => {
-    if (islandState !== 'expanded') return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    let angle = 0;
-
-    const render = () => {
-      const width = (canvas.width = canvas.parentElement?.clientWidth || 130);
-      const height = (canvas.height = canvas.parentElement?.clientHeight || 90);
-      const cx = width / 2;
-      const cy = height / 2;
-
-      ctx.clearRect(0, 0, width, height);
-
-      // Outer wireframe grid lines
-      ctx.strokeStyle = '#291e1c';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.arc(cx, cy, 40, 0, Math.PI * 2);
-      ctx.arc(cx, cy, 26, 0, Math.PI * 2);
-      ctx.arc(cx, cy, 12, 0, Math.PI * 2);
-      ctx.stroke();
-
-      // Crosshairs
-      ctx.beginPath();
-      ctx.moveTo(cx - 50, cy); ctx.lineTo(cx + 50, cy);
-      ctx.moveTo(cx, cy - 50); ctx.lineTo(cx, cy + 50);
-      ctx.stroke();
-
-      // Rotating Station Spokes & Nodes
-      const spokeCount = 12;
-      const speed = isTalking || isSpeakingTTS ? 0.04 : isThinking ? 0.06 : 0.015;
-
-      for (let i = 0; i < spokeCount; i++) {
-        const theta = angle + (i * Math.PI * 2) / spokeCount;
-        const r1 = 8;
-        const r2 = 34 + Math.sin(angle * 2 + i) * (isTalking || isSpeakingTTS ? 5 : 2);
-
-        const x1 = cx + Math.cos(theta) * r1;
-        const y1 = cy + Math.sin(theta) * r1;
-        const x2 = cx + Math.cos(theta) * r2;
-        const y2 = cy + Math.sin(theta) * r2;
-
-        ctx.strokeStyle = i % 2 === 0 ? '#ef475a' : '#f79256';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(x1, y1);
-        ctx.lineTo(x2, y2);
-        ctx.stroke();
-
-        // Node dots
-        ctx.fillStyle = '#f4b942';
-        ctx.beginPath();
-        ctx.arc(x2, y2, 1.8, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      // Center Eye Ring
-      ctx.fillStyle = isThinking ? '#f4b942' : (isTalking || isSpeakingTTS) ? '#ef475a' : '#dfd3c3';
-      ctx.beginPath();
-      ctx.arc(cx, cy, 5, 0, Math.PI * 2);
-      ctx.fill();
-
-      angle += speed;
-      animFrameRef.current = requestAnimationFrame(render);
-    };
-
-    render();
-    return () => cancelAnimationFrame(animFrameRef.current);
-  }, [isTalking, isSpeakingTTS, isThinking, islandState]);
 
   // Handle LLM API Chat Call
   const handleSend = async (customPrompt) => {
@@ -231,7 +162,7 @@ export default function App() {
 
       if (res.ok) {
         const data = await res.json();
-        const reply = data.response || 'Telemetry check complete. Systems normal.';
+        const reply = data.response || 'System parameters optimal. Neural responses ready.';
         setIsThinking(false);
 
         setMessages((prev) => [...prev, { id: Date.now() + 1, sender: 'companion', text: reply }]);
@@ -243,7 +174,7 @@ export default function App() {
       setIsThinking(false);
       setIsTalking(false);
       setIsSpeakingTTS(false);
-      const fallback = '[ALERT] Rigel telemetry connection error. Verify local backend server status.';
+      const fallback = '[ALERT] AI Backend connection error. Please verify server status.';
       setMessages((prev) => [...prev, { id: Date.now() + 2, sender: 'companion', text: fallback }]);
       speakText('Connection warning.');
     }
@@ -254,7 +185,7 @@ export default function App() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
-      handleSend('Give me a status update on the Rigel system.');
+      handleSend('Status update on neural AI system.');
       return;
     }
 
@@ -289,13 +220,13 @@ export default function App() {
     }
   };
 
-  // Render Compact State (Dynamic Island Pill with 5 Variants)
+  // Render Compact State (Dynamic Island Pill)
   if (islandState === 'compact') {
     return (
       <div
         className={`island-pill ${compactVariant}`}
         onClick={() => setExpandedState(true)}
-        title="Click to Expand Dashboard"
+        title="Click to Expand AI Companion"
       >
         {compactVariant === 'listening' ? (
           <>
@@ -328,7 +259,6 @@ export default function App() {
             <span className="pill-text text-error">Offline</span>
           </>
         ) : (
-          /* Default Idle Variant */
           <>
             <span className="pill-dot idle-dot" />
             <span className="pill-text">AI Ready</span>
@@ -338,157 +268,170 @@ export default function App() {
     );
   }
 
-  // Render Expanded Mode (Full Okudagram Dashboard)
+  // Render Expanded State (Vertical OLED Dynamic Island AI Card)
   return (
-    <div className="island-expanded">
-      {/* Top Header Bar */}
-      <header className="oku-top-panel">
-        <div className="oku-top-header">
-          <div className="oku-pill-group">
-            <div className="oku-pill-tag">era <span>34 T.E</span></div>
-            <div className="oku-pill-tag">cycles <span>{cycles.toLocaleString()}</span></div>
-            <div className="oku-pill-tag">mass <span>46</span></div>
-          </div>
-
-          <div className="header-right-group">
-            <div className="oku-pill-tag status-pill">
-              <span>{isThinking ? 'COMPUTING' : isTalking ? 'LISTENING' : isSpeakingTTS ? 'TRANSMITTING' : 'STEADY'}</span>
-            </div>
-            <button
-              className="island-close-btn"
-              onClick={(e) => {
-                e.stopPropagation();
-                setExpandedState(false);
-              }}
-              title="Collapse to Pill"
-            >
-              ✕
-            </button>
-          </div>
+    <div className="island-vertical-card">
+      {/* Top Bar Header */}
+      <header className="card-header">
+        <div className="header-badge">
+          <span className={`status-led ${isBackendOnline ? 'online' : 'offline'}`} />
+          <span className="header-title">AI COMPANION</span>
+          <span className="header-chip">LLM 1B</span>
         </div>
-
-        <div className="oku-top-grid">
-          {/* Orbital Canvas Diagram */}
-          <div className="oku-visualizer-box">
-            <canvas ref={canvasRef} className="oku-canvas" />
-          </div>
-
-          {/* kW/kg Metric Readout */}
-          <div className="oku-metric-display">
-            <div className="oku-huge-num">{powerMetric}</div>
-            <div className="oku-unit-label">kW/kg</div>
-            <div className="oku-coords-row">
-              <span>3.009°</span>
-              <span>6.016°</span>
-              <span>rigel</span>
-            </div>
-          </div>
-
-          {/* Radial Dial SVG Widget */}
-          <div className="oku-dial-widget">
-            <svg viewBox="0 0 100 100" className="oku-dial-svg">
-              <circle cx="50" cy="50" r="44" fill="none" stroke="#f79256" strokeWidth="8" strokeDasharray="60 30" />
-              <circle cx="50" cy="50" r="44" fill="none" stroke="#ef475a" strokeWidth="8" strokeDasharray="30 120" strokeDashoffset="-90" />
-              <circle cx="50" cy="50" r="30" fill="none" stroke="#dfd3c3" strokeWidth="6" strokeDasharray="80 20" />
-              <circle cx="50" cy="50" r="30" fill="none" stroke="#ef475a" strokeWidth="6" strokeDasharray="30 70" strokeDashoffset="-40" />
-              <circle cx="50" cy="50" r="18" fill="#120e0d" stroke="#f4b942" strokeWidth="2" />
-              <text x="50" y="54" fill="#dfd3c3" fontSize="10" fontWeight="bold" textAnchor="middle" fontFamily="monospace">z4</text>
-            </svg>
-          </div>
-        </div>
+        <button
+          className="card-close-btn"
+          onClick={(e) => {
+            e.stopPropagation();
+            setExpandedState(false);
+          }}
+          title="Collapse to Pill"
+        >
+          ✕
+        </button>
       </header>
 
-      {/* Bottom Main Content Panel */}
-      <main className="oku-bottom-panel">
-        {/* Left Stack Controls */}
-        <div className="oku-button-stack">
-          <button className="oku-btn" onClick={() => handleSend('Regenerate system diagnostic response.')}>
-            regenerate
-          </button>
-          <button className={`oku-btn pink ${isTalking ? 'active' : ''}`} onClick={toggleVoice}>
-            recon (voice)
-          </button>
-          <button className="oku-btn orange" onClick={() => handleSend()}>
-            engage
-          </button>
-          <button className="oku-btn" onClick={() => setIsMuted(!isMuted)}>
-            synthesis {isMuted ? '[off]' : '[on]'}
-          </button>
-          <button className="oku-btn" onClick={() => setMessages([])}>
-            atomise
-          </button>
+      {/* Widget 1: Audio Spectrum & Noise Meter (Reference Image 2 Top-Left) */}
+      <section className="widget-card noise-meter-widget">
+        <div className="widget-header">
+          <span className="meter-val">{audioDb} <small>dB</small></span>
+          <span className={`meter-tag ${audioDb > 85 ? 'loud' : 'normal'}`}>
+            {audioDb > 85 ? 'ACTIVE ⚠️' : 'NORMAL'}
+          </span>
         </div>
+        <div className="spectrum-bars-row">
+          {[...Array(16)].map((_, i) => {
+            const activeCount = Math.floor((audioDb / 100) * 16);
+            const isActive = i < activeCount;
+            let barColorClass = 'green';
+            if (i >= 10) barColorClass = 'red';
+            else if (i >= 6) barColorClass = 'yellow';
 
-        {/* Vertical Capsule Bars */}
-        <div className="oku-capsules-group">
-          <div className="oku-capsule orange">
-            <span className="capsule-symbol">ø6</span>
-            <div className="capsule-val">13_176</div>
-          </div>
-          <div className="oku-capsule yellow">
-            <span>NO₂</span>
-            <div className="capsule-val">21_226</div>
-          </div>
-          <div className="oku-capsule cream">
-            <span>H₂S</span>
-            <div className="capsule-symbol">⋔7</div>
-          </div>
-          <div className="oku-capsule taupe">
-            <span>spin</span>
-            <div className="capsule-val">406</div>
-          </div>
+            return (
+              <span
+                key={i}
+                className={`spec-bar ${barColorClass} ${isActive ? 'active' : ''}`}
+              />
+            );
+          })}
         </div>
+      </section>
 
-        {/* Interactive Chat Module */}
-        <section className="oku-chat-box">
-          <div className="oku-chat-header">
-            <span>RIGEL NEURAL CHAT</span>
-            <span>ø13_49</span>
-          </div>
-
-          <div className="oku-chat-messages">
-            {messages.map((m) => (
-              <div key={m.id} className={`oku-msg ${m.sender}`}>
-                <div className="oku-msg-sender">{m.sender === 'user' ? '► USER' : '❖ COMPANION'}</div>
-                <div>{m.text}</div>
-              </div>
-            ))}
-            {isThinking && (
-              <div className="oku-msg companion">
-                <div className="oku-msg-sender">❖ COMPANION</div>
-                <div>⚡ Processing neural output...</div>
-              </div>
-            )}
-            <div ref={chatEndRef} />
-          </div>
-
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleSend();
-            }}
-            className="oku-chat-form"
-          >
-            <input
-              type="text"
-              className="oku-chat-input"
-              placeholder="Query companion..."
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
+      {/* Widget 2: Concentric Activity Rings & Memory Pill Gauges (Reference Image 2) */}
+      <section className="widget-card stats-row-widget">
+        {/* Concentric Rings */}
+        <div className="activity-rings-container">
+          <svg viewBox="0 0 60 60" className="rings-svg">
+            {/* Outer Ring: Cyan LLM Load */}
+            <circle cx="30" cy="30" r="25" fill="none" stroke="#1e293b" strokeWidth="4" />
+            <circle
+              cx="30" cy="30" r="25" fill="none" stroke="#38bdf8" strokeWidth="4"
+              strokeDasharray="157" strokeDashoffset={157 - (157 * 0.65)} strokeLinecap="round"
             />
-            <button type="submit" className="oku-chat-submit">
-              ENGAGE ►
-            </button>
-          </form>
-        </section>
-      </main>
+            {/* Middle Ring: Pink STT Rate */}
+            <circle cx="30" cy="30" r="18" fill="none" stroke="#1e293b" strokeWidth="4" />
+            <circle
+              cx="30" cy="30" r="18" fill="none" stroke="#ec4899" strokeWidth="4"
+              strokeDasharray="113" strokeDashoffset={113 - (113 * 0.88)} strokeLinecap="round"
+            />
+            {/* Inner Ring: Yellow Audio Sample */}
+            <circle cx="30" cy="30" r="11" fill="none" stroke="#1e293b" strokeWidth="4" />
+            <circle
+              cx="30" cy="30" r="11" fill="none" stroke="#f4b942" strokeWidth="4"
+              strokeDasharray="69" strokeDashoffset={69 - (69 * 0.45)} strokeLinecap="round"
+            />
+          </svg>
+        </div>
 
-      {/* Footer Telemetry Row */}
-      <footer className="oku-telemetry-row">
-        <div className="oku-telemetry-item">techo: <span>{technoSig}/466</span></div>
-        <div className="oku-telemetry-item">voids: <span>16%</span></div>
-        <div className="oku-telemetry-item">olivine: <span>{olivinePpm} ppm</span></div>
-        <div className="oku-telemetry-item">photolysis: <span>potent</span></div>
+        {/* Memory & Token Gauges */}
+        <div className="metrics-col">
+          <div className="pill-gauge-item">
+            <span className="gauge-label">{ramUsage} <small>OF 2.0 GB</small></span>
+            <div className="capsule-dots-row">
+              <span className="cap-dot fill-cyan" />
+              <span className="cap-dot fill-cyan" />
+              <span className="cap-dot fill-cyan" />
+              <span className="cap-dot fill-cyan" />
+              <span className="cap-dot fill-empty" />
+            </div>
+          </div>
+
+          <div className="pill-gauge-item">
+            <span className="gauge-label">{tokensPerSec} <small>TOK/SEC</small></span>
+            <div className="capsule-dots-row">
+              <span className="cap-dot fill-pink" />
+              <span className="cap-dot fill-pink" />
+              <span className="cap-dot fill-pink" />
+              <span className="cap-dot fill-empty" />
+              <span className="cap-dot fill-empty" />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Widget 3: Quick Tactile Action Pills */}
+      <div className="action-pills-row">
+        <button className={`action-btn pink ${isTalking ? 'active' : ''}`} onClick={toggleVoice}>
+          🎙️ RECON (VOICE)
+        </button>
+        <button className="action-btn orange" onClick={() => handleSend()}>
+          ⚡ ENGAGE
+        </button>
+        <button className="action-btn" onClick={() => handleSend('Regenerate system response.')}>
+          🔄 REGEN
+        </button>
+        <button className="action-btn" onClick={() => setIsMuted(!isMuted)}>
+          {isMuted ? '🔈 UNMUTE' : '🔇 MUTE'}
+        </button>
+      </div>
+
+      {/* Widget 4: Vertical Neural Chat Box */}
+      <section className="vertical-chat-widget">
+        <div className="chat-widget-header">
+          <span>RIGEL NEURAL STREAM</span>
+          <span className="header-sub">ø13_49</span>
+        </div>
+
+        <div className="vertical-chat-messages">
+          {messages.map((m) => (
+            <div key={m.id} className={`chat-bubble-oled ${m.sender}`}>
+              <div className="bubble-sender">{m.sender === 'user' ? '► USER' : '❖ COMPANION'}</div>
+              <div className="bubble-text">{m.text}</div>
+            </div>
+          ))}
+          {isThinking && (
+            <div className="chat-bubble-oled companion">
+              <div className="bubble-sender">❖ COMPANION</div>
+              <div className="bubble-text thinking-dots">⚡ Processing neural output...</div>
+            </div>
+          )}
+          <div ref={chatEndRef} />
+        </div>
+
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSend();
+          }}
+          className="vertical-chat-form"
+        >
+          <input
+            type="text"
+            className="vertical-chat-input"
+            placeholder="Ask your AI companion..."
+            value={inputText}
+            onChange={(e) => setInputText(e.target.value)}
+          />
+          <button type="submit" className="vertical-chat-submit">
+            ►
+          </button>
+        </form>
+      </section>
+
+      {/* Widget 5: Telemetry Footer Strip (Reference Image 2) */}
+      <footer className="card-footer-strip">
+        <div className="footer-item">CYCLES <span>{cycles.toLocaleString()}</span></div>
+        <div className="footer-item">SPECTRUM <span>136 AQI</span></div>
+        <div className="footer-item">STATUS <span>POTENT</span></div>
       </footer>
     </div>
   );

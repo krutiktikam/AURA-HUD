@@ -8,8 +8,8 @@ let currentState = 'compact'; // 'compact' | 'expanded'
 
 const COMPACT_WIDTH = 140;
 const COMPACT_HEIGHT = 40;
-const EXPANDED_WIDTH = 480;
-const EXPANDED_HEIGHT = 420;
+const EXPANDED_WIDTH = 360;
+const EXPANDED_HEIGHT = 540;
 const TOP_OFFSET = 10;
 
 function getWindowPosition(width) {
@@ -119,7 +119,7 @@ function createTray() {
     }
   ]);
 
-  tray.setToolTip('AI Companion - Dynamic Island');
+  tray.setToolTip('AI Companion - Vertical OLED Dynamic Island');
   tray.setContextMenu(contextMenu);
 
   tray.on('click', () => {

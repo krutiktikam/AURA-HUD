@@ -1,22 +1,22 @@
-/* Okudagram Dynamic Island UI Theme */
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500;700;800&family=Share+Tech+Mono&display=swap');
+/* OLED Dynamic Island Vertical AI Card Theme */
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500;700;800&family=Inter:wght@400;600;700;800&display=swap');
 
 :root {
-  --oku-bg: #0f0a09;
-  --oku-bg-compact: rgba(10, 8, 7, 0.88);
-  --oku-frame: #dfd3c3;
-  --oku-frame-dark: #b8a994;
-  --oku-card-bg: #1c1514;
-  --oku-pink: #ef475a;
-  --oku-orange: #f79256;
-  --oku-yellow: #f4b942;
-  --oku-blue: #38bdf8;
-  --oku-taupe: #8c7c6d;
-  --oku-dark-taupe: #4d4239;
-  --oku-text-dark: #120e0d;
-  --oku-text-light: #f5efe6;
+  --oled-bg: #000000;
+  --oled-card-bg: #0d0d12;
+  --oled-widget-bg: #13131a;
+  --oled-border: rgba(255, 255, 255, 0.12);
+  
+  --cyan: #38bdf8;
+  --pink: #ef475a;
+  --pink-bright: #ec4899;
+  --orange: #f79256;
+  --yellow: #f4b942;
+  --green: #10b981;
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
 
-  --font-oku: 'Space Grotesk', sans-serif;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 }
 
@@ -34,10 +34,10 @@ html, body, #root {
   padding: 0;
   width: 100%;
   height: 100%;
-  font-family: var(--font-oku);
+  font-family: var(--font-sans);
 }
 
-/* Keyframe Animations */
+/* Animations */
 @keyframes pulse {
   0%, 100% { transform: scale(0.95); opacity: 0.5; }
   50% { transform: scale(1.05); opacity: 1; }
@@ -64,8 +64,8 @@ html, body, #root {
 .island-pill {
   width: 140px;
   height: 40px;
-  background: var(--oku-bg-compact);
-  border: 1px solid rgba(223, 211, 195, 0.2);
+  background: rgba(0, 0, 0, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 20px;
   padding: 0 14px;
   display: flex;
@@ -73,24 +73,24 @@ html, body, #root {
   justify-content: center;
   gap: 10px;
   cursor: pointer;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
   margin: 0 auto;
 }
 
 .island-pill:hover {
-  background: rgba(20, 16, 14, 0.95);
+  background: rgba(15, 15, 20, 0.95);
   transform: scale(1.03);
-  box-shadow: 0 10px 36px rgba(0, 0, 0, 0.7), 0 0 16px rgba(247, 146, 86, 0.2);
+  box-shadow: 0 10px 36px rgba(0, 0, 0, 0.8), 0 0 16px rgba(56, 189, 248, 0.2);
 }
 
 .pill-text {
   font-family: var(--font-mono);
   font-size: 0.75rem;
   font-weight: 700;
-  color: var(--oku-text-light);
+  color: var(--text-main);
   letter-spacing: 0.04em;
   white-space: nowrap;
 }
@@ -104,8 +104,8 @@ html, body, #root {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #10b981;
-  box-shadow: 0 0 8px #10b981;
+  background: var(--green);
+  box-shadow: 0 0 8px var(--green);
   animation: pulse 2s infinite ease-in-out;
   flex-shrink: 0;
 }
@@ -113,7 +113,7 @@ html, body, #root {
 /* Variant 2: Listening */
 .island-pill.listening {
   border-color: rgba(239, 71, 90, 0.4);
-  background: rgba(25, 10, 12, 0.92);
+  background: rgba(25, 10, 15, 0.92);
 }
 
 .pill-wave {
@@ -125,9 +125,9 @@ html, body, #root {
 
 .pill-wave .bar {
   width: 3px;
-  background: var(--oku-pink);
+  background: var(--pink);
   border-radius: 2px;
-  box-shadow: 0 0 6px var(--oku-pink);
+  box-shadow: 0 0 6px var(--pink);
   animation: waveBar 0.6s infinite ease-in-out;
 }
 
@@ -136,9 +136,7 @@ html, body, #root {
 .pill-wave .bar:nth-child(3) { animation-delay: 0.3s; }
 .pill-wave .bar:nth-child(4) { animation-delay: 0.45s; }
 
-.text-listening {
-  color: var(--oku-pink);
-}
+.text-listening { color: var(--pink); }
 
 /* Variant 3: Thinking */
 .island-pill.thinking {
@@ -150,15 +148,13 @@ html, body, #root {
   width: 14px;
   height: 14px;
   border: 2px solid rgba(244, 185, 66, 0.25);
-  border-top-color: var(--oku-yellow);
+  border-top-color: var(--yellow);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
   flex-shrink: 0;
 }
 
-.text-thinking {
-  color: var(--oku-yellow);
-}
+.text-thinking { color: var(--yellow); }
 
 /* Variant 4: Speaking */
 .island-pill.speaking {
@@ -175,9 +171,9 @@ html, body, #root {
 
 .pill-eq .eq-bar {
   width: 3px;
-  background: var(--oku-blue);
+  background: var(--cyan);
   border-radius: 2px;
-  box-shadow: 0 0 6px var(--oku-blue);
+  box-shadow: 0 0 6px var(--cyan);
   animation: eqBounce 0.5s infinite ease-in-out;
 }
 
@@ -186,13 +182,11 @@ html, body, #root {
 .pill-eq .eq-bar:nth-child(3) { animation-delay: 0.05s; }
 .pill-eq .eq-bar:nth-child(4) { animation-delay: 0.35s; }
 
-.text-speaking {
-  color: var(--oku-blue);
-}
+.text-speaking { color: var(--cyan); }
 
 /* Variant 5: Error / Offline */
 .island-pill.error {
-  border-left: 3px solid var(--oku-pink);
+  border-left: 3px solid var(--pink);
   border-color: rgba(247, 146, 86, 0.5);
   background: rgba(30, 10, 10, 0.92);
 }
@@ -201,70 +195,84 @@ html, body, #root {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--oku-orange);
-  box-shadow: 0 0 8px var(--oku-orange);
+  background: var(--orange);
+  box-shadow: 0 0 8px var(--orange);
   animation: pulse 1.5s infinite ease-in-out;
   flex-shrink: 0;
 }
 
-.text-error {
-  color: var(--oku-orange);
-}
+.text-error { color: var(--orange); }
 
 /* --------------------------------------------------
-   2. Expanded Dashboard Mode (480px × 420px)
+   2. Expanded State (Vertical OLED AI Card 360px × 540px)
 -------------------------------------------------- */
-.island-expanded {
-  width: 480px;
-  height: 420px;
-  background: var(--oku-bg);
-  border: 2px solid var(--oku-frame-dark);
-  border-radius: 24px;
-  padding: 10px;
+.island-vertical-card {
+  width: 360px;
+  height: 540px;
+  background: var(--oled-card-bg);
+  border: 1px solid var(--oled-border);
+  border-radius: 32px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.9), 0 0 20px rgba(247, 146, 86, 0.15);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  gap: 10px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.9), 0 0 30px rgba(56, 189, 248, 0.08);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
   margin: 0 auto;
 }
 
-/* Top Panel Header */
-.oku-top-panel {
-  background: var(--oku-frame);
-  border-radius: 14px;
-  padding: 8px 10px;
-  color: var(--oku-text-dark);
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  flex-shrink: 0;
-}
-
-.oku-top-header {
+/* Header */
+.card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  padding: 2px 4px;
 }
 
-.header-right-group {
+.header-badge {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
-.island-close-btn {
-  background: var(--oku-text-dark);
-  color: var(--oku-frame);
+.status-led {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.status-led.online { background: var(--green); box-shadow: 0 0 8px var(--green); }
+.status-led.offline { background: var(--orange); box-shadow: 0 0 8px var(--orange); }
+
+.header-title {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--text-main);
+  letter-spacing: 0.08em;
+}
+
+.header-chip {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 700;
+  background: rgba(56, 189, 248, 0.15);
+  color: var(--cyan);
+  padding: 2px 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.card-close-btn {
+  background: #1e1e24;
+  color: var(--text-muted);
   border: none;
   border-radius: 50%;
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   font-size: 0.75rem;
-  font-weight: bold;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -272,301 +280,316 @@ html, body, #root {
   transition: all 0.15s ease;
 }
 
-.island-close-btn:hover {
-  background: var(--oku-pink);
+.card-close-btn:hover {
+  background: var(--pink);
   color: #ffffff;
 }
 
-.oku-pill-group {
-  display: flex;
-  gap: 4px;
+/* Common Widget Card */
+.widget-card {
+  background: var(--oled-widget-bg);
+  border-radius: 18px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-.oku-pill-tag {
-  background: var(--oku-text-dark);
-  color: var(--oku-frame);
-  font-family: var(--font-mono);
-  font-size: 0.65rem;
-  font-weight: 700;
-  padding: 3px 8px;
-  border-radius: 8px;
-}
-
-.oku-pill-tag span {
-  color: var(--oku-yellow);
-}
-
-.oku-top-grid {
-  display: grid;
-  grid-template-columns: 140px 1fr 85px;
-  gap: 8px;
-  align-items: center;
-}
-
-/* Orbital Visualizer Canvas Box */
-.oku-visualizer-box {
-  background: #080605;
-  border-radius: 12px;
-  height: 85px;
-  position: relative;
-  overflow: hidden;
-  border: 1px solid var(--oku-text-dark);
-}
-
-.oku-canvas {
-  width: 100%;
-  height: 100%;
-}
-
-/* kW/kg Metric Readout */
-.oku-metric-display {
+/* Widget 1: Noise Meter & Spectrum Bar (Ref Image 2) */
+.noise-meter-widget {
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  padding-left: 4px;
+  gap: 8px;
 }
 
-.oku-huge-num {
+.widget-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.meter-val {
   font-family: var(--font-mono);
-  font-size: 2rem;
+  font-size: 1.1rem;
   font-weight: 800;
-  line-height: 0.9;
-  letter-spacing: -0.05em;
-  color: var(--oku-text-dark);
+  color: var(--text-main);
 }
 
-.oku-unit-label {
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: var(--oku-dark-taupe);
-  margin-top: 2px;
+.meter-val small {
+  font-size: 0.7rem;
+  color: var(--text-muted);
 }
 
-.oku-coords-row {
+.meter-tag {
   font-family: var(--font-mono);
   font-size: 0.65rem;
-  font-weight: 700;
-  color: var(--oku-dark-taupe);
-  margin-top: 4px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 8px;
+}
+.meter-tag.normal { background: rgba(16, 185, 129, 0.15); color: var(--green); }
+.meter-tag.loud { background: rgba(239, 71, 90, 0.15); color: var(--pink); }
+
+.spectrum-bars-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 22px;
+}
+
+.spec-bar {
+  flex: 1;
+  height: 100%;
+  border-radius: 3px;
+  opacity: 0.2;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.spec-bar.green { background: var(--green); }
+.spec-bar.yellow { background: var(--yellow); }
+.spec-bar.red { background: var(--pink); }
+
+.spec-bar.active {
+  opacity: 1;
+  box-shadow: 0 0 6px currentColor;
+}
+
+/* Widget 2: Concentric Activity Rings & Memory Pill Gauges (Ref Image 2) */
+.stats-row-widget {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.activity-rings-container {
+  width: 54px;
+  height: 54px;
+  flex-shrink: 0;
+}
+
+.rings-svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.metrics-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pill-gauge-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.gauge-label {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: var(--text-main);
+}
+
+.gauge-label small {
+  font-size: 0.58rem;
+  color: var(--text-muted);
+}
+
+.capsule-dots-row {
+  display: flex;
+  gap: 3px;
+}
+
+.cap-dot {
+  width: 8px;
+  height: 12px;
+  border-radius: 4px;
+}
+
+.cap-dot.fill-cyan { background: var(--cyan); box-shadow: 0 0 4px var(--cyan); }
+.cap-dot.fill-pink { background: var(--pink-bright); box-shadow: 0 0 4px var(--pink-bright); }
+.cap-dot.fill-empty { background: #262630; }
+
+/* Widget 3: Quick Tactile Action Pills */
+.action-pills-row {
   display: flex;
   gap: 6px;
 }
 
-/* Segmented Circular Dial Widget */
-.oku-dial-widget {
-  width: 75px;
-  height: 75px;
-  position: relative;
-  margin: 0 auto;
-}
-
-.oku-dial-svg {
-  width: 100%;
-  height: 100%;
-}
-
-/* Bottom Main Content Panel */
-.oku-bottom-panel {
-  background: var(--oku-frame);
-  border-radius: 14px;
-  padding: 8px;
-  color: var(--oku-text-dark);
-  display: grid;
-  grid-template-columns: 105px 105px 1fr;
-  gap: 8px;
+.action-btn {
   flex: 1;
-  min-height: 0;
-  overflow: hidden;
-}
-
-/* Vertical Button Stack */
-.oku-button-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  justify-content: space-between;
-}
-
-.oku-btn {
-  background: var(--oku-taupe);
-  color: #ffffff;
-  border: none;
+  background: #1c1c24;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text-main);
   font-family: var(--font-mono);
-  font-size: 0.65rem;
-  font-weight: 700;
-  padding: 6px 8px;
-  border-radius: 6px;
-  cursor: pointer;
-  text-transform: lowercase;
-  text-align: left;
-  transition: all 0.15s ease;
-}
-
-.oku-btn:hover {
-  filter: brightness(1.15);
-}
-
-.oku-btn.pink { background: var(--oku-pink); }
-.oku-btn.orange { background: var(--oku-orange); }
-.oku-btn.active {
-  box-shadow: inset 0 0 0 2px #ffffff;
-}
-
-/* Vertical Capsule Bars */
-.oku-capsules-group {
-  display: flex;
-  gap: 4px;
-  height: 100%;
-}
-
-.oku-capsule {
-  flex: 1;
-  border-radius: 12px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 2px;
-  color: var(--oku-text-dark);
-  font-family: var(--font-mono);
-  font-weight: 800;
   font-size: 0.62rem;
+  font-weight: 800;
+  padding: 8px 4px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
 }
 
-.oku-capsule.orange { background: var(--oku-orange); }
-.oku-capsule.yellow { background: var(--oku-yellow); }
-.oku-capsule.cream { background: #ffffff; }
-.oku-capsule.taupe { background: var(--oku-taupe); color: #ffffff; }
+.action-btn:hover {
+  background: #282834;
+  border-color: rgba(255, 255, 255, 0.2);
+}
 
-.capsule-symbol { font-size: 0.8rem; }
-.capsule-val { font-size: 0.55rem; text-align: center; }
+.action-btn.pink.active {
+  background: rgba(239, 71, 90, 0.2);
+  border-color: var(--pink);
+  color: var(--pink);
+}
 
-/* Interactive Chat Box */
-.oku-chat-box {
-  background: #0e0908;
-  border-radius: 12px;
-  padding: 8px;
+.action-btn.orange {
+  border-color: rgba(247, 146, 86, 0.3);
+}
+
+/* Widget 4: Vertical Neural Chat */
+.vertical-chat-widget {
+  background: var(--oled-card-bg);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 10px;
   display: flex;
   flex-direction: column;
-  color: var(--oku-text-light);
-  overflow: hidden;
-  border: 1px solid var(--oku-text-dark);
   flex: 1;
   min-height: 0;
+  overflow: hidden;
 }
 
-.oku-chat-header {
+.chat-widget-header {
   font-family: var(--font-mono);
   font-size: 0.65rem;
-  font-weight: 700;
-  color: var(--oku-yellow);
-  padding-bottom: 4px;
-  border-bottom: 1px solid #291d1a;
+  font-weight: 800;
+  color: var(--cyan);
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   display: flex;
   justify-content: space-between;
   flex-shrink: 0;
 }
 
-.oku-chat-messages {
+.header-sub {
+  color: var(--text-muted);
+}
+
+.vertical-chat-messages {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 4px 2px;
+  padding: 8px 2px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
-.oku-chat-messages::-webkit-scrollbar {
+.vertical-chat-messages::-webkit-scrollbar {
   width: 4px;
 }
-.oku-chat-messages::-webkit-scrollbar-thumb {
-  background: var(--oku-dark-taupe);
+.vertical-chat-messages::-webkit-scrollbar-thumb {
+  background: #2a2a36;
   border-radius: 2px;
 }
 
-.oku-msg {
-  padding: 6px 8px;
-  border-radius: 8px;
+.chat-bubble-oled {
+  padding: 8px 10px;
+  border-radius: 12px;
   font-family: var(--font-mono);
-  font-size: 0.7rem;
-  line-height: 1.3;
+  font-size: 0.72rem;
+  line-height: 1.4;
   word-break: break-word;
 }
 
-.oku-msg.user {
-  background: #241a18;
-  border-left: 3px solid var(--oku-orange);
+.chat-bubble-oled.user {
+  background: #1c1b24;
+  border-left: 3px solid var(--orange);
   align-self: flex-end;
   color: #ffffff;
-  max-width: 90%;
+  max-width: 88%;
 }
 
-.oku-msg.companion {
-  background: #191210;
-  border-left: 3px solid var(--oku-pink);
+.chat-bubble-oled.companion {
+  background: #111a28;
+  border-left: 3px solid var(--cyan);
   align-self: flex-start;
-  color: #f5efe6;
-  max-width: 95%;
+  color: var(--text-main);
+  max-width: 92%;
 }
 
-.oku-msg-sender {
+.bubble-sender {
   font-size: 0.58rem;
-  font-weight: bold;
-  margin-bottom: 2px;
+  font-weight: 800;
+  margin-bottom: 3px;
 }
-.oku-msg.user .oku-msg-sender { color: var(--oku-orange); }
-.oku-msg.companion .oku-msg-sender { color: var(--oku-pink); }
+.chat-bubble-oled.user .bubble-sender { color: var(--orange); }
+.chat-bubble-oled.companion .bubble-sender { color: var(--cyan); }
 
-.oku-chat-form {
+.thinking-dots {
+  color: var(--yellow);
+}
+
+.vertical-chat-form {
   display: flex;
-  gap: 4px;
+  gap: 6px;
   margin-top: 6px;
   flex-shrink: 0;
 }
 
-.oku-chat-input {
+.vertical-chat-input {
   flex: 1;
-  background: #170f0e;
-  border: 1px solid #332421;
-  border-radius: 6px;
-  padding: 6px 8px;
+  background: #161620;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 8px 12px;
   color: #ffffff;
   font-family: var(--font-mono);
-  font-size: 0.7rem;
+  font-size: 0.72rem;
   outline: none;
 }
 
-.oku-chat-input:focus {
-  border-color: var(--oku-yellow);
+.vertical-chat-input:focus {
+  border-color: var(--cyan);
 }
 
-.oku-chat-submit {
-  background: var(--oku-pink);
-  color: #ffffff;
+.vertical-chat-submit {
+  background: var(--cyan);
+  color: #000000;
   border: none;
-  border-radius: 6px;
-  font-family: var(--font-mono);
-  font-weight: 700;
-  font-size: 0.65rem;
-  padding: 0 10px;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  font-size: 0.75rem;
+  font-weight: 800;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease;
 }
 
-/* Footer Telemetry Row */
-.oku-telemetry-row {
+.vertical-chat-submit:hover {
+  transform: scale(1.08);
+}
+
+/* Widget 5: Telemetry Footer Strip (Ref Image 2) */
+.card-footer-strip {
+  background: var(--oled-widget-bg);
+  border-radius: 14px;
+  padding: 6px 12px;
   display: flex;
+  align-items: center;
   justify-content: space-between;
   font-family: var(--font-mono);
-  font-size: 0.62rem;
-  font-weight: 700;
-  background: var(--oku-text-dark);
-  color: var(--oku-frame);
-  padding: 6px 10px;
-  border-radius: 8px;
+  font-size: 0.6rem;
+  font-weight: 800;
+  color: var(--text-muted);
+  border: 1px solid rgba(255, 255, 255, 0.05);
   flex-shrink: 0;
 }
 
-.oku-telemetry-item span {
-  color: var(--oku-yellow);
+.footer-item span {
+  color: var(--cyan);
 }
