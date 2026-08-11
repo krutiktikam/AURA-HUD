@@ -6,7 +6,7 @@ let win = null;
 let tray = null;
 let currentState = 'compact'; // 'compact' | 'expanded'
 
-const COMPACT_WIDTH = 120;
+const COMPACT_WIDTH = 140;
 const COMPACT_HEIGHT = 40;
 const EXPANDED_WIDTH = 400;
 const EXPANDED_HEIGHT = 320;
@@ -60,7 +60,7 @@ function createWindow() {
     win.loadFile(path.join(__dirname, 'ui', 'dist', 'index.html'));
   }
 
-  // Handle blur (clicking outside when expanded -> collapse to compact)
+  // Auto-collapse when user clicks outside the window (Blur event)
   win.on('blur', () => {
     if (currentState === 'expanded' && win && !win.isDestroyed()) {
       updateWindowState('compact');
@@ -84,7 +84,6 @@ function createTray() {
   if (fs.existsSync(iconPath)) {
     trayIcon = nativeImage.createFromPath(iconPath);
   } else {
-    // Create fallback empty icon
     trayIcon = nativeImage.createEmpty();
   }
 
@@ -92,14 +91,14 @@ function createTray() {
 
   const contextMenu = Menu.buildFromTemplate([
     {
-      label: 'Toggle State (Compact/Expanded)',
+      label: 'Toggle Island (Compact/Expanded)',
       click: () => {
         const nextState = currentState === 'compact' ? 'expanded' : 'compact';
         updateWindowState(nextState);
       }
     },
     {
-      label: 'Show/Hide',
+      label: 'Show/Hide Window',
       click: () => {
         if (!win) return;
         if (win.isVisible()) {
@@ -112,7 +111,7 @@ function createTray() {
     },
     { type: 'separator' },
     {
-      label: 'Quit',
+      label: 'Quit Companion',
       click: () => {
         app.isQuitting = true;
         app.quit();

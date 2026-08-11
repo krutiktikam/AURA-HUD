@@ -2,8 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import './styles.css';
 
 export default function App() {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [islandState, setIslandState] = useState('compact'); // 'compact' | 'expanded'
+  const [compactVariant, setCompactVariant] = useState('idle'); // 'idle' | 'listening' | 'thinking' | 'speaking' | 'error'
   const [isBackendOnline, setIsBackendOnline] = useState(true);
+  const [isSpeakingTTS, setIsSpeakingTTS] = useState(false);
 
   const [messages, setMessages] = useState([
     {
@@ -29,17 +31,17 @@ export default function App() {
   const animFrameRef = useRef(null);
   const recognitionRef = useRef(null);
 
-  // Synchronize state with Electron main process via IPC
+  // IPC listener for Electron window state
   useEffect(() => {
     if (window.electronAPI?.getWindowState) {
       window.electronAPI.getWindowState().then((state) => {
-        setIsExpanded(state === 'expanded');
+        setIslandState(state || 'compact');
       });
     }
 
     if (window.electronAPI?.onWindowStateChanged) {
       const unsubscribe = window.electronAPI.onWindowStateChanged((state) => {
-        setIsExpanded(state === 'expanded');
+        setIslandState(state || 'compact');
       });
       return () => {
         if (typeof unsubscribe === 'function') unsubscribe();
@@ -48,11 +50,27 @@ export default function App() {
   }, []);
 
   const setExpandedState = (expanded) => {
-    setIsExpanded(expanded);
+    const newState = expanded ? 'expanded' : 'compact';
+    setIslandState(newState);
     if (window.electronAPI?.setWindowState) {
-      window.electronAPI.setWindowState(expanded ? 'expanded' : 'compact');
+      window.electronAPI.setWindowState(newState);
     }
   };
+
+  // Derive compact pill variant from application activity state
+  useEffect(() => {
+    if (!isBackendOnline) {
+      setCompactVariant('error');
+    } else if (isTalking) {
+      setCompactVariant('listening');
+    } else if (isThinking) {
+      setCompactVariant('thinking');
+    } else if (isSpeakingTTS) {
+      setCompactVariant('speaking');
+    } else {
+      setCompactVariant('idle');
+    }
+  }, [isBackendOnline, isTalking, isThinking, isSpeakingTTS]);
 
   // Check backend health periodically
   useEffect(() => {
@@ -78,7 +96,7 @@ export default function App() {
   useEffect(() => {
     const timer = setInterval(() => {
       setCycles((c) => c + 1);
-      if (isTalking) {
+      if (isTalking || isSpeakingTTS) {
         setPowerMetric(1600 + Math.floor(Math.random() * 120));
         setOlivinePpm(70 + Math.floor(Math.random() * 25));
       } else {
@@ -87,14 +105,14 @@ export default function App() {
       }
     }, 1000);
     return () => clearInterval(timer);
-  }, [isTalking]);
+  }, [isTalking, isSpeakingTTS]);
 
   // Auto-scroll chat when expanded
   useEffect(() => {
-    if (isExpanded) {
+    if (islandState === 'expanded') {
       chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [messages, isThinking, isExpanded]);
+  }, [messages, isThinking, islandState]);
 
   // Spoken voice TTS
   const speakText = (text) => {
@@ -112,9 +130,9 @@ export default function App() {
       );
       if (preferred) utterance.voice = preferred;
 
-      utterance.onstart = () => setIsTalking(true);
-      utterance.onend = () => setIsTalking(false);
-      utterance.onerror = () => setIsTalking(false);
+      utterance.onstart = () => setIsSpeakingTTS(true);
+      utterance.onend = () => setIsSpeakingTTS(false);
+      utterance.onerror = () => setIsSpeakingTTS(false);
 
       window.speechSynthesis.speak(utterance);
     }
@@ -122,15 +140,15 @@ export default function App() {
 
   // Orbital Canvas Visualizer renderer when expanded
   useEffect(() => {
-    if (!isExpanded) return;
+    if (islandState !== 'expanded') return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     let angle = 0;
 
     const render = () => {
-      const width = (canvas.width = canvas.parentElement?.clientWidth || 140);
-      const height = (canvas.height = canvas.parentElement?.clientHeight || 110);
+      const width = (canvas.width = canvas.parentElement?.clientWidth || 130);
+      const height = (canvas.height = canvas.parentElement?.clientHeight || 90);
       const cx = width / 2;
       const cy = height / 2;
 
@@ -140,25 +158,25 @@ export default function App() {
       ctx.strokeStyle = '#291e1c';
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.arc(cx, cy, 45, 0, Math.PI * 2);
-      ctx.arc(cx, cy, 30, 0, Math.PI * 2);
-      ctx.arc(cx, cy, 15, 0, Math.PI * 2);
+      ctx.arc(cx, cy, 40, 0, Math.PI * 2);
+      ctx.arc(cx, cy, 26, 0, Math.PI * 2);
+      ctx.arc(cx, cy, 12, 0, Math.PI * 2);
       ctx.stroke();
 
       // Crosshairs
       ctx.beginPath();
-      ctx.moveTo(cx - 55, cy); ctx.lineTo(cx + 55, cy);
-      ctx.moveTo(cx, cy - 55); ctx.lineTo(cx, cy + 55);
+      ctx.moveTo(cx - 50, cy); ctx.lineTo(cx + 50, cy);
+      ctx.moveTo(cx, cy - 50); ctx.lineTo(cx, cy + 50);
       ctx.stroke();
 
       // Rotating Station Spokes & Nodes
       const spokeCount = 12;
-      const speed = isTalking ? 0.04 : isThinking ? 0.06 : 0.015;
+      const speed = isTalking || isSpeakingTTS ? 0.04 : isThinking ? 0.06 : 0.015;
 
       for (let i = 0; i < spokeCount; i++) {
         const theta = angle + (i * Math.PI * 2) / spokeCount;
-        const r1 = 10;
-        const r2 = 40 + Math.sin(angle * 2 + i) * (isTalking ? 6 : 2);
+        const r1 = 8;
+        const r2 = 34 + Math.sin(angle * 2 + i) * (isTalking || isSpeakingTTS ? 5 : 2);
 
         const x1 = cx + Math.cos(theta) * r1;
         const y1 = cy + Math.sin(theta) * r1;
@@ -175,14 +193,14 @@ export default function App() {
         // Node dots
         ctx.fillStyle = '#f4b942';
         ctx.beginPath();
-        ctx.arc(x2, y2, 2, 0, Math.PI * 2);
+        ctx.arc(x2, y2, 1.8, 0, Math.PI * 2);
         ctx.fill();
       }
 
       // Center Eye Ring
-      ctx.fillStyle = isThinking ? '#f4b942' : isTalking ? '#ef475a' : '#dfd3c3';
+      ctx.fillStyle = isThinking ? '#f4b942' : (isTalking || isSpeakingTTS) ? '#ef475a' : '#dfd3c3';
       ctx.beginPath();
-      ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+      ctx.arc(cx, cy, 5, 0, Math.PI * 2);
       ctx.fill();
 
       angle += speed;
@@ -191,7 +209,7 @@ export default function App() {
 
     render();
     return () => cancelAnimationFrame(animFrameRef.current);
-  }, [isTalking, isThinking, isExpanded]);
+  }, [isTalking, isSpeakingTTS, isThinking, islandState]);
 
   // Handle LLM API Chat Call
   const handleSend = async (customPrompt) => {
@@ -224,6 +242,7 @@ export default function App() {
     } catch (e) {
       setIsThinking(false);
       setIsTalking(false);
+      setIsSpeakingTTS(false);
       const fallback = '[ALERT] Rigel telemetry connection error. Verify local backend server status.';
       setMessages((prev) => [...prev, { id: Date.now() + 2, sender: 'companion', text: fallback }]);
       speakText('Connection warning.');
@@ -242,6 +261,7 @@ export default function App() {
     if (isTalking) {
       window.speechSynthesis?.cancel();
       setIsTalking(false);
+      setIsSpeakingTTS(false);
       return;
     }
 
@@ -269,38 +289,56 @@ export default function App() {
     }
   };
 
-  // Render Compact State (Pill)
-  if (!isExpanded) {
+  // Render Compact State (Dynamic Island Pill with 5 Variants)
+  if (islandState === 'compact') {
     return (
       <div
-        className="island-compact"
+        className={`island-pill ${compactVariant}`}
         onClick={() => setExpandedState(true)}
-        title="Click to Expand Dynamic Island"
+        title="Click to Expand Dashboard"
       >
-        <span className={`compact-dot ${isBackendOnline ? 'online' : 'offline'}`} />
-        
-        <div className="compact-visualizer">
-          {isTalking ? (
-            <div className="compact-wave">
+        {compactVariant === 'listening' ? (
+          <>
+            <div className="pill-wave">
+              <span className="bar" />
               <span className="bar" />
               <span className="bar" />
               <span className="bar" />
             </div>
-          ) : isThinking ? (
-            <div className="compact-spinner" />
-          ) : (
-            <div className="compact-steady-pulse" />
-          )}
-        </div>
-
-        <span className="compact-label">
-          {isTalking ? 'TALK' : isThinking ? 'THINK' : isBackendOnline ? 'Z4' : 'OFF'}
-        </span>
+            <span className="pill-text text-listening">Listening...</span>
+          </>
+        ) : compactVariant === 'thinking' ? (
+          <>
+            <div className="pill-spinner" />
+            <span className="pill-text text-thinking">Thinking...</span>
+          </>
+        ) : compactVariant === 'speaking' ? (
+          <>
+            <div className="pill-eq">
+              <span className="eq-bar" />
+              <span className="eq-bar" />
+              <span className="eq-bar" />
+              <span className="eq-bar" />
+            </div>
+            <span className="pill-text text-speaking">Speaking...</span>
+          </>
+        ) : compactVariant === 'error' ? (
+          <>
+            <span className="pill-dot error-dot" />
+            <span className="pill-text text-error">Offline</span>
+          </>
+        ) : (
+          /* Default Idle Variant */
+          <>
+            <span className="pill-dot idle-dot" />
+            <span className="pill-text">AI Ready</span>
+          </>
+        )}
       </div>
     );
   }
 
-  // Render Expanded State (Okudagram Dashboard)
+  // Render Expanded Mode (Full Okudagram Dashboard)
   return (
     <div className="island-expanded">
       {/* Top Header Bar */}
@@ -311,10 +349,10 @@ export default function App() {
             <div className="oku-pill-tag">cycles <span>{cycles.toLocaleString()}</span></div>
             <div className="oku-pill-tag">mass <span>46</span></div>
           </div>
-          
+
           <div className="header-right-group">
             <div className="oku-pill-tag status-pill">
-              <span>{isThinking ? 'COMPUTING' : isTalking ? 'TRANSMITTING' : 'STEADY'}</span>
+              <span>{isThinking ? 'COMPUTING' : isTalking ? 'LISTENING' : isSpeakingTTS ? 'TRANSMITTING' : 'STEADY'}</span>
             </div>
             <button
               className="island-close-btn"

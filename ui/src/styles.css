@@ -3,18 +3,19 @@
 
 :root {
   --oku-bg: #0f0a09;
-  --oku-bg-compact: #0a0807;
+  --oku-bg-compact: rgba(10, 8, 7, 0.88);
   --oku-frame: #dfd3c3;
   --oku-frame-dark: #b8a994;
   --oku-card-bg: #1c1514;
   --oku-pink: #ef475a;
   --oku-orange: #f79256;
   --oku-yellow: #f4b942;
+  --oku-blue: #38bdf8;
   --oku-taupe: #8c7c6d;
   --oku-dark-taupe: #4d4239;
   --oku-text-dark: #120e0d;
   --oku-text-light: #f5efe6;
-  
+
   --font-oku: 'Space Grotesk', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 }
@@ -38,9 +39,8 @@ html, body, #root {
 
 /* Keyframe Animations */
 @keyframes pulse {
-  0% { transform: scale(0.95); opacity: 0.5; }
+  0%, 100% { transform: scale(0.95); opacity: 0.5; }
   50% { transform: scale(1.05); opacity: 1; }
-  100% { transform: scale(0.95); opacity: 0.5; }
 }
 
 @keyframes spin {
@@ -50,71 +50,80 @@ html, body, #root {
 
 @keyframes waveBar {
   0%, 100% { height: 4px; }
-  50% { height: 14px; }
+  50% { height: 16px; }
+}
+
+@keyframes eqBounce {
+  0%, 100% { height: 4px; }
+  50% { height: 16px; }
 }
 
 /* --------------------------------------------------
-   1. Compact Dynamic Island State (120px × 40px Pill)
+   1. Dynamic Island Compact Pill (140px × 40px)
 -------------------------------------------------- */
-.island-compact {
-  width: 120px;
+.island-pill {
+  width: 140px;
   height: 40px;
-  background: rgba(10, 8, 7, 0.92);
-  border: 1px solid rgba(223, 211, 195, 0.25);
+  background: var(--oku-bg-compact);
+  border: 1px solid rgba(223, 211, 195, 0.2);
   border-radius: 20px;
-  padding: 0 12px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  cursor: pointer;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.8), 0 0 12px rgba(247, 146, 86, 0.15);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  margin: 0 auto;
-}
-
-.island-compact:hover {
-  background: rgba(20, 16, 14, 0.96);
-  border-color: var(--oku-orange);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.9), 0 0 16px rgba(247, 146, 86, 0.3);
-  transform: scale(1.02);
-}
-
-.compact-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.compact-dot.online {
-  background: #10b981;
-  box-shadow: 0 0 8px #10b981;
-  animation: pulse 2s infinite ease-in-out;
-}
-
-.compact-dot.offline {
-  background: var(--oku-orange);
-  box-shadow: 0 0 8px var(--oku-orange);
-  animation: pulse 1.5s infinite ease-in-out;
-}
-
-.compact-visualizer {
+  padding: 0 14px;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 20px;
+  gap: 10px;
+  cursor: pointer;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  margin: 0 auto;
 }
 
-.compact-wave {
+.island-pill:hover {
+  background: rgba(20, 16, 14, 0.95);
+  transform: scale(1.03);
+  box-shadow: 0 10px 36px rgba(0, 0, 0, 0.7), 0 0 16px rgba(247, 146, 86, 0.2);
+}
+
+.pill-text {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--oku-text-light);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+/* Variant 1: Idle */
+.island-pill.idle {
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.pill-dot.idle-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 8px #10b981;
+  animation: pulse 2s infinite ease-in-out;
+  flex-shrink: 0;
+}
+
+/* Variant 2: Listening */
+.island-pill.listening {
+  border-color: rgba(239, 71, 90, 0.4);
+  background: rgba(25, 10, 12, 0.92);
+}
+
+.pill-wave {
   display: flex;
   align-items: center;
   gap: 3px;
+  height: 18px;
 }
 
-.compact-wave .bar {
+.pill-wave .bar {
   width: 3px;
   background: var(--oku-pink);
   border-radius: 2px;
@@ -122,38 +131,88 @@ html, body, #root {
   animation: waveBar 0.6s infinite ease-in-out;
 }
 
-.compact-wave .bar:nth-child(1) { animation-delay: 0.0s; }
-.compact-wave .bar:nth-child(2) { animation-delay: 0.2s; }
-.compact-wave .bar:nth-child(3) { animation-delay: 0.4s; }
+.pill-wave .bar:nth-child(1) { animation-delay: 0.0s; }
+.pill-wave .bar:nth-child(2) { animation-delay: 0.15s; }
+.pill-wave .bar:nth-child(3) { animation-delay: 0.3s; }
+.pill-wave .bar:nth-child(4) { animation-delay: 0.45s; }
 
-.compact-spinner {
-  width: 12px;
-  height: 12px;
-  border: 2px solid rgba(244, 185, 66, 0.3);
+.text-listening {
+  color: var(--oku-pink);
+}
+
+/* Variant 3: Thinking */
+.island-pill.thinking {
+  border-color: rgba(244, 185, 66, 0.4);
+  background: rgba(25, 20, 10, 0.92);
+}
+
+.pill-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(244, 185, 66, 0.25);
   border-top-color: var(--oku-yellow);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
 }
 
-.compact-steady-pulse {
-  width: 6px;
-  height: 6px;
+.text-thinking {
+  color: var(--oku-yellow);
+}
+
+/* Variant 4: Speaking */
+.island-pill.speaking {
+  border-color: rgba(56, 189, 248, 0.4);
+  background: rgba(10, 20, 30, 0.92);
+}
+
+.pill-eq {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 18px;
+}
+
+.pill-eq .eq-bar {
+  width: 3px;
+  background: var(--oku-blue);
+  border-radius: 2px;
+  box-shadow: 0 0 6px var(--oku-blue);
+  animation: eqBounce 0.5s infinite ease-in-out;
+}
+
+.pill-eq .eq-bar:nth-child(1) { animation-delay: 0.1s; }
+.pill-eq .eq-bar:nth-child(2) { animation-delay: 0.25s; }
+.pill-eq .eq-bar:nth-child(3) { animation-delay: 0.05s; }
+.pill-eq .eq-bar:nth-child(4) { animation-delay: 0.35s; }
+
+.text-speaking {
+  color: var(--oku-blue);
+}
+
+/* Variant 5: Error / Offline */
+.island-pill.error {
+  border-left: 3px solid var(--oku-pink);
+  border-color: rgba(247, 146, 86, 0.5);
+  background: rgba(30, 10, 10, 0.92);
+}
+
+.pill-dot.error-dot {
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
-  background: var(--oku-frame);
-  box-shadow: 0 0 6px var(--oku-frame);
-  animation: pulse 2.5s infinite ease-in-out;
+  background: var(--oku-orange);
+  box-shadow: 0 0 8px var(--oku-orange);
+  animation: pulse 1.5s infinite ease-in-out;
+  flex-shrink: 0;
 }
 
-.compact-label {
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  font-weight: 800;
-  color: var(--oku-frame);
-  letter-spacing: 0.05em;
+.text-error {
+  color: var(--oku-orange);
 }
 
 /* --------------------------------------------------
-   2. Expanded Dynamic Island State (400px × 320px)
+   2. Expanded Dashboard Mode (400px × 320px)
 -------------------------------------------------- */
 .island-expanded {
   width: 400px;
@@ -168,7 +227,7 @@ html, body, #root {
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.9), 0 0 20px rgba(247, 146, 86, 0.15);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
   margin: 0 auto;
 }
@@ -410,7 +469,6 @@ html, body, #root {
   gap: 6px;
 }
 
-/* Custom Scrollbar for Chat */
 .oku-chat-messages::-webkit-scrollbar {
   width: 4px;
 }
