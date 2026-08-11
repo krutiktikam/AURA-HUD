@@ -90,8 +90,8 @@ ollama pull llama3.2:1b
 # Create and activate virtual environment
 python -m venv venv
 
-# On Windows:
-venv\Scripts\activate
+#venv\Scripts\activate On Windows:
+
 # On Linux/macOS:
 source venv/bin/activate
 

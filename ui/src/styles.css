@@ -1,8 +1,9 @@
-/* Okudagram Arcade Retro-Futuristic UI Theme */
+/* Okudagram Dynamic Island UI Theme */
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500;700;800&family=Share+Tech+Mono&display=swap');
 
 :root {
   --oku-bg: #0f0a09;
+  --oku-bg-compact: #0a0807;
   --oku-frame: #dfd3c3;
   --oku-frame-dark: #b8a994;
   --oku-card-bg: #1c1514;
@@ -25,59 +26,210 @@
   user-select: none;
 }
 
-body {
-  background-color: var(--oku-bg);
-  color: var(--oku-text-light);
-  font-family: var(--font-oku);
-  height: 100vh;
+html, body, #root {
+  background: transparent !important;
   overflow: hidden;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  font-family: var(--font-oku);
 }
 
-/* Full Screen Okudagram Frame Layout */
-.oku-container {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  padding: 16px;
-  gap: 16px;
-  background: var(--oku-bg);
-  overflow-y: auto;
+/* Keyframe Animations */
+@keyframes pulse {
+  0% { transform: scale(0.95); opacity: 0.5; }
+  50% { transform: scale(1.05); opacity: 1; }
+  100% { transform: scale(0.95); opacity: 0.5; }
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes waveBar {
+  0%, 100% { height: 4px; }
+  50% { height: 14px; }
 }
 
 /* --------------------------------------------------
-   Top Okudagram Section: Visualizer & Dial Metrics
+   1. Compact Dynamic Island State (120px × 40px Pill)
 -------------------------------------------------- */
+.island-compact {
+  width: 120px;
+  height: 40px;
+  background: rgba(10, 8, 7, 0.92);
+  border: 1px solid rgba(223, 211, 195, 0.25);
+  border-radius: 20px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.8), 0 0 12px rgba(247, 146, 86, 0.15);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  margin: 0 auto;
+}
+
+.island-compact:hover {
+  background: rgba(20, 16, 14, 0.96);
+  border-color: var(--oku-orange);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.9), 0 0 16px rgba(247, 146, 86, 0.3);
+  transform: scale(1.02);
+}
+
+.compact-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.compact-dot.online {
+  background: #10b981;
+  box-shadow: 0 0 8px #10b981;
+  animation: pulse 2s infinite ease-in-out;
+}
+
+.compact-dot.offline {
+  background: var(--oku-orange);
+  box-shadow: 0 0 8px var(--oku-orange);
+  animation: pulse 1.5s infinite ease-in-out;
+}
+
+.compact-visualizer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 20px;
+}
+
+.compact-wave {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.compact-wave .bar {
+  width: 3px;
+  background: var(--oku-pink);
+  border-radius: 2px;
+  box-shadow: 0 0 6px var(--oku-pink);
+  animation: waveBar 0.6s infinite ease-in-out;
+}
+
+.compact-wave .bar:nth-child(1) { animation-delay: 0.0s; }
+.compact-wave .bar:nth-child(2) { animation-delay: 0.2s; }
+.compact-wave .bar:nth-child(3) { animation-delay: 0.4s; }
+
+.compact-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(244, 185, 66, 0.3);
+  border-top-color: var(--oku-yellow);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.compact-steady-pulse {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--oku-frame);
+  box-shadow: 0 0 6px var(--oku-frame);
+  animation: pulse 2.5s infinite ease-in-out;
+}
+
+.compact-label {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: var(--oku-frame);
+  letter-spacing: 0.05em;
+}
+
+/* --------------------------------------------------
+   2. Expanded Dynamic Island State (400px × 320px)
+-------------------------------------------------- */
+.island-expanded {
+  width: 400px;
+  height: 320px;
+  background: var(--oku-bg);
+  border: 2px solid var(--oku-frame-dark);
+  border-radius: 24px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.9), 0 0 20px rgba(247, 146, 86, 0.15);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+  margin: 0 auto;
+}
+
+/* Top Panel Header */
 .oku-top-panel {
   background: var(--oku-frame);
-  border-radius: 28px;
-  padding: 16px;
+  border-radius: 16px;
+  padding: 8px 10px;
   color: var(--oku-text-dark);
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.7);
+  gap: 6px;
 }
 
 .oku-top-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+}
+
+.header-right-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.island-close-btn {
+  background: var(--oku-text-dark);
+  color: var(--oku-frame);
+  border: none;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  font-size: 0.75rem;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.island-close-btn:hover {
+  background: var(--oku-pink);
+  color: #ffffff;
 }
 
 .oku-pill-group {
   display: flex;
-  gap: 8px;
+  gap: 4px;
 }
 
 .oku-pill-tag {
   background: var(--oku-text-dark);
   color: var(--oku-frame);
   font-family: var(--font-mono);
-  font-size: 0.75rem;
+  font-size: 0.65rem;
   font-weight: 700;
-  padding: 6px 14px;
-  border-radius: 12px;
+  padding: 3px 8px;
+  border-radius: 8px;
 }
 
 .oku-pill-tag span {
@@ -86,25 +238,19 @@ body {
 
 .oku-top-grid {
   display: grid;
-  grid-template-columns: 240px 1fr 200px;
-  gap: 16px;
+  grid-template-columns: 130px 1fr 90px;
+  gap: 8px;
   align-items: center;
 }
 
-@media (max-width: 900px) {
-  .oku-top-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* Orbital Visualizer Box */
+/* Orbital Visualizer Canvas Box */
 .oku-visualizer-box {
   background: #080605;
-  border-radius: 20px;
-  height: 160px;
+  border-radius: 12px;
+  height: 90px;
   position: relative;
   overflow: hidden;
-  border: 2px solid var(--oku-text-dark);
+  border: 1px solid var(--oku-text-dark);
 }
 
 .oku-canvas {
@@ -112,17 +258,17 @@ body {
   height: 100%;
 }
 
-/* Big kW/kg Metric Display */
+/* kW/kg Metric Readout */
 .oku-metric-display {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding-left: 12px;
+  padding-left: 4px;
 }
 
 .oku-huge-num {
   font-family: var(--font-mono);
-  font-size: 4rem;
+  font-size: 2.2rem;
   font-weight: 800;
   line-height: 0.9;
   letter-spacing: -0.05em;
@@ -130,26 +276,26 @@ body {
 }
 
 .oku-unit-label {
-  font-size: 1.2rem;
+  font-size: 0.75rem;
   font-weight: 700;
   color: var(--oku-dark-taupe);
-  margin-top: 4px;
+  margin-top: 2px;
 }
 
 .oku-coords-row {
   font-family: var(--font-mono);
-  font-size: 1rem;
+  font-size: 0.65rem;
   font-weight: 700;
   color: var(--oku-dark-taupe);
-  margin-top: 14px;
+  margin-top: 6px;
   display: flex;
-  gap: 12px;
+  gap: 6px;
 }
 
 /* Segmented Circular Dial Widget */
 .oku-dial-widget {
-  width: 170px;
-  height: 170px;
+  width: 80px;
+  height: 80px;
   position: relative;
   margin: 0 auto;
 }
@@ -159,33 +305,24 @@ body {
   height: 100%;
 }
 
-/* --------------------------------------------------
-   Bottom Okudagram Section: Controls & Conversation
--------------------------------------------------- */
+/* Bottom Main Content Panel */
 .oku-bottom-panel {
   background: var(--oku-frame);
-  border-radius: 28px;
-  padding: 16px;
+  border-radius: 16px;
+  padding: 8px;
   color: var(--oku-text-dark);
   display: grid;
-  grid-template-columns: 160px 180px 1fr;
-  gap: 16px;
+  grid-template-columns: 90px 90px 1fr;
+  gap: 8px;
   flex: 1;
-  min-height: 380px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.7);
-}
-
-@media (max-width: 950px) {
-  .oku-bottom-panel {
-    grid-template-columns: 1fr;
-  }
+  min-height: 0;
 }
 
 /* Vertical Button Stack */
 .oku-button-stack {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .oku-btn {
@@ -193,10 +330,10 @@ body {
   color: #ffffff;
   border: none;
   font-family: var(--font-mono);
-  font-size: 0.85rem;
+  font-size: 0.65rem;
   font-weight: 700;
-  padding: 12px 14px;
-  border-radius: 10px;
+  padding: 6px 8px;
+  border-radius: 6px;
   cursor: pointer;
   text-transform: lowercase;
   text-align: left;
@@ -210,28 +347,27 @@ body {
 .oku-btn.pink { background: var(--oku-pink); }
 .oku-btn.orange { background: var(--oku-orange); }
 .oku-btn.active {
-  box-shadow: inset 0 0 0 3px #ffffff;
+  box-shadow: inset 0 0 0 2px #ffffff;
 }
 
-/* Capsule Stat Bars */
+/* Vertical Capsule Bars */
 .oku-capsules-group {
   display: flex;
-  gap: 8px;
+  gap: 4px;
 }
 
 .oku-capsule {
   flex: 1;
-  border-radius: 30px;
+  border-radius: 14px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 6px;
+  padding: 6px 2px;
   color: var(--oku-text-dark);
   font-family: var(--font-mono);
   font-weight: 800;
-  font-size: 0.8rem;
-  min-height: 220px;
+  font-size: 0.65rem;
 }
 
 .oku-capsule.orange { background: var(--oku-orange); }
@@ -239,28 +375,27 @@ body {
 .oku-capsule.cream { background: #ffffff; }
 .oku-capsule.taupe { background: var(--oku-taupe); color: #ffffff; }
 
-.capsule-symbol {
-  font-size: 1.4rem;
-}
+.capsule-symbol { font-size: 0.85rem; }
+.capsule-val { font-size: 0.55rem; text-align: center; }
 
-/* Embedded Okudagram Chat Module */
+/* Interactive Chat Box */
 .oku-chat-box {
   background: #0e0908;
-  border-radius: 20px;
-  padding: 14px;
+  border-radius: 12px;
+  padding: 8px;
   display: flex;
   flex-direction: column;
   color: var(--oku-text-light);
   overflow: hidden;
-  border: 2px solid var(--oku-text-dark);
+  border: 1px solid var(--oku-text-dark);
 }
 
 .oku-chat-header {
   font-family: var(--font-mono);
-  font-size: 0.8rem;
+  font-size: 0.65rem;
   font-weight: 700;
   color: var(--oku-yellow);
-  padding-bottom: 8px;
+  padding-bottom: 4px;
   border-bottom: 1px solid #291d1a;
   display: flex;
   justify-content: space-between;
@@ -269,39 +404,48 @@ body {
 .oku-chat-messages {
   flex: 1;
   overflow-y: auto;
-  padding: 12px 4px;
+  padding: 6px 2px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 6px;
+}
+
+/* Custom Scrollbar for Chat */
+.oku-chat-messages::-webkit-scrollbar {
+  width: 4px;
+}
+.oku-chat-messages::-webkit-scrollbar-thumb {
+  background: var(--oku-dark-taupe);
+  border-radius: 2px;
 }
 
 .oku-msg {
-  padding: 10px 14px;
-  border-radius: 12px;
+  padding: 6px 8px;
+  border-radius: 8px;
   font-family: var(--font-mono);
-  font-size: 0.88rem;
-  line-height: 1.4;
+  font-size: 0.72rem;
+  line-height: 1.3;
   word-break: break-word;
 }
 
 .oku-msg.user {
   background: #241a18;
-  border-left: 4px solid var(--oku-orange);
+  border-left: 3px solid var(--oku-orange);
   align-self: flex-end;
   color: #ffffff;
-  max-width: 85%;
+  max-width: 90%;
 }
 
 .oku-msg.companion {
   background: #191210;
-  border-left: 4px solid var(--oku-pink);
+  border-left: 3px solid var(--oku-pink);
   align-self: flex-start;
   color: #f5efe6;
-  max-width: 90%;
+  max-width: 95%;
 }
 
 .oku-msg-sender {
-  font-size: 0.75rem;
+  font-size: 0.6rem;
   font-weight: bold;
   margin-bottom: 2px;
 }
@@ -310,19 +454,19 @@ body {
 
 .oku-chat-form {
   display: flex;
-  gap: 8px;
-  margin-top: 8px;
+  gap: 4px;
+  margin-top: 4px;
 }
 
 .oku-chat-input {
   flex: 1;
   background: #170f0e;
   border: 1px solid #332421;
-  border-radius: 8px;
-  padding: 10px 14px;
+  border-radius: 6px;
+  padding: 6px 8px;
   color: #ffffff;
   font-family: var(--font-mono);
-  font-size: 0.85rem;
+  font-size: 0.7rem;
   outline: none;
 }
 
@@ -334,25 +478,25 @@ body {
   background: var(--oku-pink);
   color: #ffffff;
   border: none;
-  border-radius: 8px;
+  border-radius: 6px;
   font-family: var(--font-mono);
   font-weight: 700;
-  font-size: 0.8rem;
-  padding: 0 16px;
+  font-size: 0.65rem;
+  padding: 0 10px;
   cursor: pointer;
 }
 
-/* Bottom Telemetry Footer Strip */
+/* Footer Telemetry Row */
 .oku-telemetry-row {
   display: flex;
-  gap: 16px;
+  justify-content: space-between;
   font-family: var(--font-mono);
-  font-size: 0.75rem;
+  font-size: 0.6rem;
   font-weight: 700;
   background: var(--oku-text-dark);
   color: var(--oku-frame);
-  padding: 8px 16px;
-  border-radius: 12px;
+  padding: 4px 10px;
+  border-radius: 8px;
 }
 
 .oku-telemetry-item span {
