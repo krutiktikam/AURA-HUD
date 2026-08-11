@@ -9,8 +9,8 @@ let currentState = 'compact'; // 'compact' | 'expanded'
 // Safe area bounding dimensions
 const COMPACT_WIDTH = 160;
 const COMPACT_HEIGHT = 60;
-const EXPANDED_WIDTH = 1113;
-const EXPANDED_HEIGHT = 385;
+const EXPANDED_WIDTH = 1150; // Extra padding for shadows
+const EXPANDED_HEIGHT = 420;
 const TOP_OFFSET = 10;
 
 function getWindowPosition(width) {
@@ -139,14 +139,20 @@ function createTray() {
 }
 
 function setupIPC() {
+  // OBJECTIVE 1: Dynamic Window Resizing (The "Mail Slot" Fix)
+  ipcMain.handle('resize-window', (_event, width, height) => {
+    if (!win || win.isDestroyed()) return false;
+    const { x, y } = getWindowPosition(width);
+    win.setBounds({ x, y, width, height }, true);
+    return true;
+  });
+
   ipcMain.handle('set-window-state', (_event, state) => {
     updateWindowState(state);
     return currentState;
   });
 
-  ipcMain.handle('get-window-state', () => {
-    return currentState;
-  });
+  ipcMain.handle('get-window-state', () => currentState);
 
   ipcMain.handle('toggle-window-state', () => {
     const nextState = currentState === 'compact' ? 'expanded' : 'compact';
@@ -155,11 +161,9 @@ function setupIPC() {
   });
 
   ipcMain.handle('animation-complete', (_event, targetState) => {
-    if (win && !win.isDestroyed()) {
-      if (targetState === 'compact') {
-        const { x, y } = getWindowPosition(COMPACT_WIDTH);
-        win.setBounds({ x, y, width: COMPACT_WIDTH, height: COMPACT_HEIGHT }, true);
-      }
+    if (win && !win.isDestroyed() && targetState === 'compact') {
+      const { x, y } = getWindowPosition(COMPACT_WIDTH);
+      win.setBounds({ x, y, width: COMPACT_WIDTH, height: COMPACT_HEIGHT }, true);
     }
     return true;
   });

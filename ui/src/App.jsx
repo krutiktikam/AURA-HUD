@@ -4,7 +4,7 @@ import { Mic, Zap, RotateCw, VolumeX, Terminal, X } from 'lucide-react';
 import './styles.css';
 
 // Typewriter Effect Component for Neural Stream Output
-function TypewriterText({ text, speed = 20, onComplete }) {
+function TypewriterText({ text, speed = 20 }) {
   const [displayedText, setDisplayedText] = useState('');
 
   useEffect(() => {
@@ -16,7 +16,6 @@ function TypewriterText({ text, speed = 20, onComplete }) {
         i++;
       } else {
         clearInterval(timer);
-        if (onComplete) onComplete();
       }
     }, speed);
 
@@ -89,7 +88,7 @@ export default function App() {
   const chatEndRef = useRef(null);
   const recognitionRef = useRef(null);
 
-  // IPC listener for Electron window state
+  // Sync IPC state
   useEffect(() => {
     if (window.electronAPI?.getWindowState) {
       window.electronAPI.getWindowState().then((state) => {
@@ -107,26 +106,25 @@ export default function App() {
     }
   }, []);
 
-  // Rule 3: Expanding: Resize window to 1113x385 FIRST before expanding UI
-  const handleExpand = () => {
-    if (window.electronAPI?.setWindowState) {
-      window.electronAPI.setWindowState('expanded').then(() => {
-        setIsExpanded(true);
-      });
-    } else {
-      setIsExpanded(true);
+  /* ============================================================
+     OBJECTIVE 4: State Handshake Logic
+     ============================================================ */
+  // Expanding: Resize window to 1150x420 FIRST (for shadow padding), then expand UI
+  const handleExpand = async () => {
+    if (window.electronAPI?.resizeWindow) {
+      await window.electronAPI.resizeWindow(1150, 420);
     }
+    setIsExpanded(true);
   };
 
-  // Rule 3: Collapsing: Run Framer Motion shrink animation FIRST, then resize window to 160x60
+  // Shrinking: Run Framer Motion exit animation FIRST, wait 400ms, then resize window to 160x60
   const handleCollapse = () => {
     setIsExpanded(false);
-  };
-
-  const handleAnimationComplete = () => {
-    if (!isExpanded && window.electronAPI?.animationComplete) {
-      window.electronAPI.animationComplete('compact');
-    }
+    setTimeout(async () => {
+      if (window.electronAPI?.resizeWindow) {
+        await window.electronAPI.resizeWindow(160, 60);
+      }
+    }, 400);
   };
 
   // Auto-scroll chat
@@ -174,10 +172,9 @@ export default function App() {
 
       if (res.ok) {
         const data = await res.json();
-        const reply = data.response || 'Telemetry check optimal. Neural systems nominal.';
         setIsThinking(false);
-        setMessages((prev) => [...prev, { id: Date.now() + 1, sender: 'companion', text: reply }]);
-        speakText(reply);
+        setMessages((prev) => [...prev, { id: Date.now() + 1, sender: 'companion', text: data.response }]);
+        speakText(data.response);
       } else {
         throw new Error('API Error');
       }
@@ -231,38 +228,47 @@ export default function App() {
   };
 
   return (
-    /* RULE 2: Root Container: Exactly window size, completely bg-transparent, centered flexbox */
+    /* Safe Area Root Container: Transparent root flexbox matching window size */
     <div className="w-full h-full flex items-center justify-center bg-transparent select-none p-2 overflow-hidden">
       <AnimatePresence mode="wait">
         {!isExpanded ? (
           /* ============================================================
-             RULE 2: Collapsed "Pill" State (w-[140px] h-[40px])
-             Centered in safe area bounding box (160x60) with no clipping
+             OBJECTIVE 2: Upgraded "Docked" State (140px × 40px inside 160x60)
              ============================================================ */
           <motion.div
-            key="collapsed-pill"
+            key="docked-pill"
             layoutId="dynamic-island"
             onClick={handleExpand}
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.8 }}
-            onAnimationComplete={handleAnimationComplete}
-            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-            className="w-[140px] h-[40px] rounded-full bg-[#0d1117]/90 backdrop-blur-md border border-teal-500/30 shadow-lg shadow-teal-500/10 cursor-pointer flex items-center justify-center gap-2 px-3 hover:border-teal-400/60 hover:shadow-teal-500/20 transition-all select-none"
+            transition={{ type: 'spring', stiffness: 350, damping: 25 }}
+            className="w-[140px] h-[40px] rounded-full bg-[#0d1117]/90 backdrop-blur-md border border-teal-500/30 shadow-lg shadow-teal-500/10 cursor-pointer flex items-center justify-center gap-2.5 px-3 hover:border-teal-400/60 hover:shadow-teal-500/20 transition-all select-none group"
             title="Click to expand AI Companion"
           >
-            <motion.div
-              animate={{ opacity: [0.4, 1, 0.4], scale: [0.9, 1.1, 0.9] }}
-              transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-              className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]"
-            />
-            <span className="font-sans font-semibold text-xs text-slate-200 tracking-wide">
+            {/* Tactical Telemetry Glowing Gauge */}
+            <div className="relative w-4 h-4 flex items-center justify-center">
+              <motion.div
+                animate={{ opacity: [0.4, 1, 0.4], scale: [0.9, 1.15, 0.9] }}
+                transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]"
+              />
+              <svg viewBox="0 0 36 36" className="absolute inset-0 w-full h-full transform -rotate-90">
+                <circle cx="18" cy="18" r="14" fill="none" stroke="#1f2937" strokeWidth="3" />
+                <circle
+                  cx="18" cy="18" r="14" fill="none" stroke="#2dd4bf" strokeWidth="3"
+                  strokeDasharray="88" strokeDashoffset="28" strokeLinecap="round"
+                />
+              </svg>
+            </div>
+
+            <span className="font-sans font-semibold text-xs text-slate-200 tracking-wide group-hover:text-teal-300 transition-colors">
               {isTalking ? 'Listening...' : isThinking ? 'Thinking...' : isSpeakingTTS ? 'Speaking...' : 'AI Ready'}
             </span>
           </motion.div>
         ) : (
           /* ============================================================
-             Expanded "Landscape Dashboard" (1113px × 385px)
+             OBJECTIVE 3: Expanded "Landscape Dashboard" (1113px × 385px)
              ============================================================ */
           <motion.div
             key="expanded-dashboard"
@@ -270,11 +276,10 @@ export default function App() {
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9 }}
-            onAnimationComplete={handleAnimationComplete}
-            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+            transition={{ type: 'spring', stiffness: 350, damping: 25 }}
             className="w-[1113px] h-[385px] bg-[#0d1117]/95 backdrop-blur-xl border border-teal-500/20 rounded-2xl shadow-2xl overflow-hidden text-slate-100 font-sans flex flex-col justify-between select-none"
           >
-            {/* SECTION A: Top Header Bar */}
+            {/* Header */}
             <header className="h-[42px] px-5 py-2 flex items-center justify-between border-b border-teal-500/10 bg-[#161b22]/50 flex-shrink-0">
               <div className="flex items-center gap-3">
                 <span className="text-teal-400 font-mono font-bold tracking-wider text-sm flex items-center gap-2">
@@ -299,9 +304,9 @@ export default function App() {
               </div>
             </header>
 
-            {/* MAIN CONTENT AREA: 3-Column CSS Grid */}
+            {/* 3-Column CSS Grid Main Area */}
             <main className="grid grid-cols-12 gap-4 p-4 flex-1 min-h-0">
-              {/* SECTION B: Column 1 (Hardware & Telemetry) - col-span-3 */}
+              {/* Column 1 (Hardware & Telemetry) - col-span-3 */}
               <section className="col-span-3 flex flex-col gap-3">
                 {/* 51 dB Active EQ Meter Card */}
                 <div className="bg-[#161b22]/80 border border-teal-500/10 rounded-xl p-3.5 flex flex-col gap-2.5">
@@ -357,7 +362,7 @@ export default function App() {
                 </div>
               </section>
 
-              {/* SECTION C: Column 2 (Action Controls) - col-span-3 */}
+              {/* Column 2 (Action Controls) - col-span-3 */}
               <section className="col-span-3 grid grid-cols-2 gap-2.5">
                 <button
                   onClick={toggleVoice}
@@ -402,7 +407,7 @@ export default function App() {
                 </button>
               </section>
 
-              {/* SECTION D: Column 3 (Neural Stream Output) - col-span-6 */}
+              {/* Column 3 (Neural Stream Output) - col-span-6 */}
               <section className="col-span-6 bg-[#161b22]/70 border border-teal-500/10 rounded-xl p-3.5 flex flex-col justify-between flex-1 min-h-0 relative overflow-hidden bg-hud-grid">
                 <div className="flex items-center justify-between border-b border-teal-500/10 pb-2 flex-shrink-0">
                   <span className="font-mono text-xs font-bold text-teal-400 tracking-wider flex items-center gap-1.5">
@@ -471,7 +476,7 @@ export default function App() {
               </section>
             </main>
 
-            {/* SECTION A: Bottom Status Footer */}
+            {/* Bottom Status Footer */}
             <footer className="h-[32px] px-6 flex items-center justify-between border-t border-teal-500/10 bg-[#161b22]/30 text-[11px] font-mono text-slate-400 opacity-80 flex-shrink-0">
               <div>
                 CYCLES <span className="text-teal-400 font-semibold">13,607</span>

@@ -2,6 +2,9 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
+  // IPC method for dynamic window resizing to fix clipping during animations
+  resizeWindow: (width, height) => ipcRenderer.invoke('resize-window', width, height),
+
   // Window state operations for Dynamic Island behavior
   getWindowState: () => ipcRenderer.invoke('get-window-state'),
   setWindowState: (state) => ipcRenderer.invoke('set-window-state', state), // 'compact' | 'expanded'
