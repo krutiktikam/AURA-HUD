@@ -1,30 +1,91 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Mic, Zap, RotateCw, VolumeX, Terminal, X, Circle } from 'lucide-react';
 import './styles.css';
 
-export default function App() {
-  const [islandState, setIslandState] = useState('compact'); // 'compact' | 'expanded'
-  const [compactVariant, setCompactVariant] = useState('idle'); // 'idle' | 'listening' | 'thinking' | 'speaking' | 'error'
-  const [isBackendOnline, setIsBackendOnline] = useState(true);
-  const [isSpeakingTTS, setIsSpeakingTTS] = useState(false);
+// Typewriter Effect Component for Neural Stream Output
+function TypewriterText({ text, speed = 25, onComplete }) {
+  const [displayedText, setDisplayedText] = useState('');
 
+  useEffect(() => {
+    setDisplayedText('');
+    let i = 0;
+    const timer = setInterval(() => {
+      if (i < text.length) {
+        setDisplayedText((prev) => prev + text.charAt(i));
+        i++;
+      } else {
+        clearInterval(timer);
+        if (onComplete) onComplete();
+      }
+    }, speed);
+
+    return () => clearInterval(timer);
+  }, [text, speed]);
+
+  return <span>{displayedText}</span>;
+}
+
+// Active EQ Meter Component with Framer Motion random block animations
+function AnimatedEQMeter({ isTalking, isThinking, isSpeaking }) {
+  const bars = [
+    { type: 'green' }, { type: 'green' }, { type: 'green' }, { type: 'green' },
+    { type: 'green' }, { type: 'green' }, { type: 'green' }, { type: 'yellow' },
+    { type: 'yellow' }, { type: 'yellow' }, { type: 'yellow' }, { type: 'red' },
+    { type: 'red' }, { type: 'red' }, { type: 'red' }, { type: 'red' }
+  ];
+
+  return (
+    <div className="flex items-end gap-1 h-6 w-full">
+      {bars.map((bar, i) => {
+        const activeProbability = isTalking || isSpeaking ? 0.9 : isThinking ? 0.6 : 0.35;
+        const colorClass =
+          bar.type === 'green'
+            ? 'bg-emerald-400 shadow-[0_0_6px_#34d399]'
+            : bar.type === 'yellow'
+            ? 'bg-amber-400 shadow-[0_0_6px_#fbbf24]'
+            : 'bg-rose-500 shadow-[0_0_6px_#f43f5e]';
+
+        return (
+          <motion.div
+            key={i}
+            className={`flex-1 rounded-sm ${colorClass}`}
+            animate={{
+              height: ['20%', `${Math.floor(Math.random() * 80 + 20)}%`, '30%'],
+              opacity: [0.3, Math.random() < activeProbability ? 1 : 0.2, 0.4]
+            }}
+            transition={{
+              duration: 0.4 + (i % 5) * 0.1,
+              repeat: Infinity,
+              repeatType: 'mirror',
+              ease: 'easeInOut'
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+export default function App() {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [isBackendOnline, setIsBackendOnline] = useState(true);
+
+  // Activity States
+  const [isTalking, setIsTalking] = useState(false);
+  const [isThinking, setIsThinking] = useState(false);
+  const [isSpeakingTTS, setIsSpeakingTTS] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+
+  // Neural Chat Feed
   const [messages, setMessages] = useState([
     {
       id: 1,
       sender: 'companion',
-      text: 'AI COMPANION ONLINE: Neural core active. Voice & telemetry systems ready.',
-    },
+      text: 'AI COMPANION ONLINE: Neural core active. Voice & telemetry systems ready.'
+    }
   ]);
-
   const [inputText, setInputText] = useState('');
-  const [isTalking, setIsTalking] = useState(false);
-  const [isThinking, setIsThinking] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
-
-  // Dynamic Live Metrics (matching widgets)
-  const [cycles, setCycles] = useState(13534);
-  const [audioDb, setAudioDb] = useState(49);
-  const [ramUsage, setRamUsage] = useState(1.32);
-  const [tokensPerSec, setTokensPerSec] = useState(46);
 
   const chatEndRef = useRef(null);
   const recognitionRef = useRef(null);
@@ -33,13 +94,13 @@ export default function App() {
   useEffect(() => {
     if (window.electronAPI?.getWindowState) {
       window.electronAPI.getWindowState().then((state) => {
-        setIslandState(state || 'compact');
+        setIsExpanded(state === 'expanded');
       });
     }
 
     if (window.electronAPI?.onWindowStateChanged) {
       const unsubscribe = window.electronAPI.onWindowStateChanged((state) => {
-        setIslandState(state || 'compact');
+        setIsExpanded(state === 'expanded');
       });
       return () => {
         if (typeof unsubscribe === 'function') unsubscribe();
@@ -47,78 +108,29 @@ export default function App() {
     }
   }, []);
 
-  const setExpandedState = (expanded) => {
-    const newState = expanded ? 'expanded' : 'compact';
-    setIslandState(newState);
+  const toggleExpanded = (expandedState) => {
+    setIsExpanded(expandedState);
     if (window.electronAPI?.setWindowState) {
-      window.electronAPI.setWindowState(newState);
+      window.electronAPI.setWindowState(expandedState ? 'expanded' : 'compact');
     }
   };
 
-  // Derive compact pill variant from activity state
-  useEffect(() => {
-    if (!isBackendOnline) {
-      setCompactVariant('error');
-    } else if (isTalking) {
-      setCompactVariant('listening');
-    } else if (isThinking) {
-      setCompactVariant('thinking');
-    } else if (isSpeakingTTS) {
-      setCompactVariant('speaking');
-    } else {
-      setCompactVariant('idle');
+  // Close with exit animation and IPC notification
+  const handleClose = () => {
+    setIsExpanded(false);
+    if (window.electronAPI?.setWindowState) {
+      window.electronAPI.setWindowState('compact');
     }
-  }, [isBackendOnline, isTalking, isThinking, isSpeakingTTS]);
+  };
 
-  // Check backend health periodically
+  // Auto-scroll chat
   useEffect(() => {
-    const checkHealth = async () => {
-      try {
-        const res = await fetch('http://localhost:8000/api/health');
-        if (res.ok) {
-          setIsBackendOnline(true);
-        } else {
-          setIsBackendOnline(false);
-        }
-      } catch {
-        setIsBackendOnline(false);
-      }
-    };
-
-    checkHealth();
-    const interval = setInterval(checkHealth, 5000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Increment metrics for responsive audio spectrum and system activity
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCycles((c) => c + 1);
-      if (isTalking || isSpeakingTTS) {
-        setAudioDb(82 + Math.floor(Math.random() * 18));
-        setRamUsage(1.48);
-        setTokensPerSec(58);
-      } else if (isThinking) {
-        setAudioDb(62 + Math.floor(Math.random() * 12));
-        setRamUsage(1.65);
-        setTokensPerSec(62);
-      } else {
-        setAudioDb(46 + Math.floor(Math.random() * 6));
-        setRamUsage(1.32);
-        setTokensPerSec(46);
-      }
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [isTalking, isSpeakingTTS, isThinking]);
-
-  // Auto-scroll chat when expanded
-  useEffect(() => {
-    if (islandState === 'expanded') {
+    if (isExpanded) {
       chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [messages, isThinking, islandState]);
+  }, [messages, isThinking, isExpanded]);
 
-  // Spoken voice TTS
+  // Spoken TTS
   const speakText = (text) => {
     if (isMuted) return;
     if ('speechSynthesis' in window) {
@@ -128,12 +140,6 @@ export default function App() {
       utterance.rate = 1.0;
       utterance.pitch = 0.95;
 
-      const voices = window.speechSynthesis.getVoices();
-      const preferred = voices.find(
-        (v) => v.lang.startsWith('en') && (v.name.includes('Natural') || v.name.includes('David') || v.name.includes('Zira'))
-      );
-      if (preferred) utterance.voice = preferred;
-
       utterance.onstart = () => setIsSpeakingTTS(true);
       utterance.onend = () => setIsSpeakingTTS(false);
       utterance.onerror = () => setIsSpeakingTTS(false);
@@ -142,7 +148,7 @@ export default function App() {
     }
   };
 
-  // Handle LLM API Chat Call
+  // Handle Send LLM Chat
   const handleSend = async (customPrompt) => {
     const prompt = customPrompt || inputText;
     if (!prompt.trim() || isThinking) return;
@@ -157,35 +163,33 @@ export default function App() {
       const res = await fetch('http://localhost:8000/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify({ prompt })
       });
 
       if (res.ok) {
         const data = await res.json();
-        const reply = data.response || 'System parameters optimal. Neural responses ready.';
+        const reply = data.response || 'Telemetry check optimal. Neural systems nominal.';
         setIsThinking(false);
-
         setMessages((prev) => [...prev, { id: Date.now() + 1, sender: 'companion', text: reply }]);
         speakText(reply);
       } else {
         throw new Error('API Error');
       }
-    } catch (e) {
+    } catch {
       setIsThinking(false);
       setIsTalking(false);
       setIsSpeakingTTS(false);
-      const fallback = '[ALERT] AI Backend connection error. Please verify server status.';
+      const fallback = '[ALERT] Rigel neural stream warning. Local backend offline.';
       setMessages((prev) => [...prev, { id: Date.now() + 2, sender: 'companion', text: fallback }]);
       speakText('Connection warning.');
     }
   };
 
-  // Push to talk mic
+  // Mic Recon Toggle
   const toggleVoice = () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-
     if (!SpeechRecognition) {
-      handleSend('Status update on neural AI system.');
+      handleSend('Give me a diagnostic status update.');
       return;
     }
 
@@ -215,230 +219,263 @@ export default function App() {
 
     try {
       recognitionRef.current.start();
-    } catch (e) {
+    } catch {
       setIsTalking(false);
     }
   };
 
-  // Render Compact State (Animated Dynamic Island Pill)
-  if (islandState === 'compact') {
-    return (
-      <div
-        className={`island-pill ${compactVariant}`}
-        onClick={() => setExpandedState(true)}
-        title="Click to Expand AI Companion"
-      >
-        {compactVariant === 'listening' ? (
-          <>
-            <div className="pill-wave">
-              <span className="bar" />
-              <span className="bar" />
-              <span className="bar" />
-              <span className="bar" />
-            </div>
-            <span className="pill-text text-listening">Listening...</span>
-          </>
-        ) : compactVariant === 'thinking' ? (
-          <>
-            <div className="pill-spinner" />
-            <span className="pill-text text-thinking">Thinking...</span>
-          </>
-        ) : compactVariant === 'speaking' ? (
-          <>
-            <div className="pill-eq">
-              <span className="eq-bar" />
-              <span className="eq-bar" />
-              <span className="eq-bar" />
-              <span className="eq-bar" />
-            </div>
-            <span className="pill-text text-speaking">Speaking...</span>
-          </>
-        ) : compactVariant === 'error' ? (
-          <>
-            <span className="pill-dot error-dot" />
-            <span className="pill-text text-error">Offline</span>
-          </>
-        ) : (
-          <>
-            <span className="pill-dot idle-dot" />
-            <span className="pill-text">AI Ready</span>
-          </>
-        )}
-      </div>
-    );
-  }
-
-  // Render Expanded State (Horizontal Animated Dynamic Island Card 540px × 350px)
   return (
-    <div className="island-horizontal-card animate-expand">
-      {/* Top Bar Header */}
-      <header className="card-header">
-        <div className="header-badge">
-          <span className={`status-led ${isBackendOnline ? 'online' : 'offline'}`} />
-          <span className="header-title">AI COMPANION</span>
-          <span className="header-chip">LLM 1B</span>
-        </div>
-        <div className="header-actions">
-          <span className="status-tag">
-            {isThinking ? 'COMPUTING' : isTalking ? 'LISTENING' : isSpeakingTTS ? 'SPEAKING' : 'STEADY'}
-          </span>
-          <button
-            className="card-close-btn"
-            onClick={(e) => {
-              e.stopPropagation();
-              setExpandedState(false);
-            }}
-            title="Collapse to Pill"
+    <div className="w-full h-full flex items-start justify-center pt-2">
+      <AnimatePresence mode="wait">
+        {!isExpanded ? (
+          /* ============================================================
+             OBJECTIVE 2: Collapsed "Pill" State (140px × 40px)
+             ============================================================ */
+          <motion.div
+            key="collapsed-pill"
+            layoutId="dynamic-island"
+            onClick={() => toggleExpanded(true)}
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+            className="w-[140px] h-[40px] rounded-full bg-[#0d1117]/90 backdrop-blur-md border border-teal-500/30 shadow-lg shadow-teal-500/10 cursor-pointer flex items-center justify-center gap-2 px-3 hover:border-teal-400/60 hover:shadow-teal-500/20 transition-all select-none"
+            title="Click to expand AI Companion"
           >
-            ✕
-          </button>
-        </div>
-      </header>
-
-      {/* Main 2-Column Grid */}
-      <div className="horizontal-card-body">
-        {/* Left Column: Metrics & Control Widgets */}
-        <div className="metrics-left-column">
-          {/* Noise Meter Widget */}
-          <section className="widget-card noise-meter-widget">
-            <div className="widget-header">
-              <span className="meter-val">{audioDb} <small>dB</small></span>
-              <span className={`meter-tag ${audioDb > 80 ? 'loud' : 'normal'}`}>
-                {audioDb > 80 ? 'ACTIVE ⚠️' : 'NORMAL'}
-              </span>
-            </div>
-            <div className="spectrum-bars-row">
-              {[...Array(14)].map((_, i) => {
-                const activeCount = Math.floor((audioDb / 100) * 14);
-                const isActive = i < activeCount;
-                let barColorClass = 'green';
-                if (i >= 9) barColorClass = 'red';
-                else if (i >= 5) barColorClass = 'yellow';
-
-                return (
-                  <span
-                    key={i}
-                    className={`spec-bar ${barColorClass} ${isActive ? 'active' : ''}`}
-                  />
-                );
-              })}
-            </div>
-          </section>
-
-          {/* Activity Rings & Gauges Widget */}
-          <section className="widget-card stats-row-widget">
-            <div className="activity-rings-container">
-              <svg viewBox="0 0 60 60" className="rings-svg">
-                <circle cx="30" cy="30" r="25" fill="none" stroke="#1e293b" strokeWidth="4" />
-                <circle
-                  cx="30" cy="30" r="25" fill="none" stroke="#38bdf8" strokeWidth="4"
-                  strokeDasharray="157" strokeDashoffset={157 - (157 * 0.65)} strokeLinecap="round"
-                />
-                <circle cx="30" cy="30" r="18" fill="none" stroke="#1e293b" strokeWidth="4" />
-                <circle
-                  cx="30" cy="30" r="18" fill="none" stroke="#ec4899" strokeWidth="4"
-                  strokeDasharray="113" strokeDashoffset={113 - (113 * 0.88)} strokeLinecap="round"
-                />
-                <circle cx="30" cy="30" r="11" fill="none" stroke="#1e293b" strokeWidth="4" />
-                <circle
-                  cx="30" cy="30" r="11" fill="none" stroke="#f4b942" strokeWidth="4"
-                  strokeDasharray="69" strokeDashoffset={69 - (69 * 0.45)} strokeLinecap="round"
-                />
-              </svg>
-            </div>
-
-            <div className="metrics-col">
-              <div className="pill-gauge-item">
-                <span className="gauge-label">{ramUsage} <small>OF 2.0 GB</small></span>
-                <div className="capsule-dots-row">
-                  <span className="cap-dot fill-cyan" />
-                  <span className="cap-dot fill-cyan" />
-                  <span className="cap-dot fill-cyan" />
-                  <span className="cap-dot fill-cyan" />
-                  <span className="cap-dot fill-empty" />
-                </div>
-              </div>
-
-              <div className="pill-gauge-item">
-                <span className="gauge-label">{tokensPerSec} <small>TOK/SEC</small></span>
-                <div className="capsule-dots-row">
-                  <span className="cap-dot fill-pink" />
-                  <span className="cap-dot fill-pink" />
-                  <span className="cap-dot fill-pink" />
-                  <span className="cap-dot fill-empty" />
-                  <span className="cap-dot fill-empty" />
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* Quick Action Pill Buttons */}
-          <div className="action-pills-grid">
-            <button className={`action-btn pink ${isTalking ? 'active' : ''}`} onClick={toggleVoice}>
-              🎙️ RECON (VOICE)
-            </button>
-            <button className="action-btn orange" onClick={() => handleSend()}>
-              ⚡ ENGAGE
-            </button>
-            <button className="action-btn" onClick={() => handleSend('Regenerate system response.')}>
-              🔄 REGEN
-            </button>
-            <button className="action-btn" onClick={() => setIsMuted(!isMuted)}>
-              {isMuted ? '🔈 UNMUTE' : '🔇 MUTE'}
-            </button>
-          </div>
-        </div>
-
-        {/* Right Column: Neural Chat Stream */}
-        <section className="horizontal-chat-widget">
-          <div className="chat-widget-header">
-            <span>RIGEL NEURAL STREAM</span>
-            <span className="header-sub">ø13_49</span>
-          </div>
-
-          <div className="horizontal-chat-messages">
-            {messages.map((m) => (
-              <div key={m.id} className={`chat-bubble-oled ${m.sender}`}>
-                <div className="bubble-sender">{m.sender === 'user' ? '► USER' : '❖ COMPANION'}</div>
-                <div className="bubble-text">{m.text}</div>
-              </div>
-            ))}
-            {isThinking && (
-              <div className="chat-bubble-oled companion">
-                <div className="bubble-sender">❖ COMPANION</div>
-                <div className="bubble-text thinking-dots">⚡ Processing neural output...</div>
-              </div>
-            )}
-            <div ref={chatEndRef} />
-          </div>
-
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleSend();
-            }}
-            className="horizontal-chat-form"
-          >
-            <input
-              type="text"
-              className="horizontal-chat-input"
-              placeholder="Ask your AI companion..."
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
+            <motion.div
+              animate={{ opacity: [0.4, 1, 0.4], scale: [0.9, 1.1, 0.9] }}
+              transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+              className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]"
             />
-            <button type="submit" className="horizontal-chat-submit">
-              ►
-            </button>
-          </form>
-        </section>
-      </div>
+            <span className="font-sans font-semibold text-xs text-slate-200 tracking-wide">
+              {isTalking ? 'Listening...' : isThinking ? 'Thinking...' : isSpeakingTTS ? 'Speaking...' : 'AI Ready'}
+            </span>
+          </motion.div>
+        ) : (
+          /* ============================================================
+             OBJECTIVE 3: Expanded "Landscape Dashboard" (1113px × 385px)
+             ============================================================ */
+          <motion.div
+            key="expanded-dashboard"
+            layoutId="dynamic-island"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+            className="w-[1113px] h-[385px] bg-[#0d1117]/95 backdrop-blur-xl border border-teal-500/20 rounded-2xl shadow-2xl overflow-hidden text-slate-100 font-sans flex flex-col justify-between select-none"
+          >
+            {/* SECTION A: Top Header Bar */}
+            <header className="h-[42px] px-5 py-2 flex items-center justify-between border-b border-teal-500/10 bg-[#161b22]/50 flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <span className="text-teal-400 font-mono font-bold tracking-wider text-sm flex items-center gap-2">
+                  <span className="text-teal-400">◆</span> AI COMPANION
+                </span>
+                <span className="bg-teal-500/10 border border-teal-500/30 text-teal-300 text-[10px] px-2 py-0.5 rounded-full font-mono font-semibold">
+                  LLM 1B
+                </span>
+              </div>
 
-      {/* Footer Telemetry Strip */}
-      <footer className="card-footer-strip">
-        <div className="footer-item">CYCLES <span>{cycles.toLocaleString()}</span></div>
-        <div className="footer-item">SPECTRUM <span>136 AQI</span></div>
-        <div className="footer-item">STATUS <span>POTENT</span></div>
-      </footer>
+              <div className="flex items-center gap-3">
+                <span className="bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs px-2.5 py-0.5 rounded-md font-mono font-semibold tracking-wide">
+                  {isThinking ? 'COMPUTING' : isTalking ? 'LISTENING' : isSpeakingTTS ? 'TRANSMITTING' : 'STEADY'}
+                </span>
+                <button
+                  onClick={handleClose}
+                  className="w-6 h-6 rounded-full bg-[#21262d] hover:bg-rose-500/80 hover:text-white text-slate-400 flex items-center justify-center transition-all cursor-pointer"
+                  title="Close Dashboard"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </header>
+
+            {/* MAIN CONTENT AREA: 3-Column CSS Grid */}
+            <main className="grid grid-cols-12 gap-4 p-4 flex-1 min-h-0">
+              {/* SECTION B: Column 1 (Hardware & Telemetry) - col-span-3 */}
+              <section className="col-span-3 flex flex-col gap-3">
+                {/* 51 dB Active EQ Meter Card */}
+                <div className="bg-[#161b22]/80 border border-teal-500/10 rounded-xl p-3.5 flex flex-col gap-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono font-bold text-sm text-slate-100 flex items-baseline gap-1">
+                      51 <small className="text-xs font-normal text-slate-400">dB</small>
+                    </span>
+                    <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded">
+                      ACTIVE
+                    </span>
+                  </div>
+
+                  {/* Framer Motion Active EQ Meter */}
+                  <AnimatedEQMeter isTalking={isTalking} isThinking={isThinking} isSpeaking={isSpeakingTTS} />
+                </div>
+
+                {/* Circular Ring Chart (1.32 OF 2.0 GB & 46 TOK/SEC) */}
+                <div className="bg-[#161b22]/80 border border-teal-500/10 rounded-xl p-3.5 flex items-center gap-4 flex-1">
+                  <div className="relative w-16 h-16 flex-shrink-0 flex items-center justify-center">
+                    <svg viewBox="0 0 80 80" className="w-full h-full transform -rotate-90">
+                      {/* Outer Ring: Neon Cyan (RAM) */}
+                      <circle cx="40" cy="40" r="32" fill="none" stroke="#1f2937" strokeWidth="6" />
+                      <circle
+                        cx="40" cy="40" r="32" fill="none" stroke="#38bdf8" strokeWidth="6"
+                        strokeDasharray="201" strokeDashoffset={201 - 201 * 0.66}
+                        strokeLinecap="round" className="shadow-[0_0_10px_#38bdf8]"
+                      />
+                      {/* Inner Ring: Neon Pink (Tokens) */}
+                      <circle cx="40" cy="40" r="22" fill="none" stroke="#1f2937" strokeWidth="6" />
+                      <circle
+                        cx="40" cy="40" r="22" fill="none" stroke="#ec4899" strokeWidth="6"
+                        strokeDasharray="138" strokeDashoffset={138 - 138 * 0.76}
+                        strokeLinecap="round" className="shadow-[0_0_10px_#ec4899]"
+                      />
+                    </svg>
+                  </div>
+
+                  <div className="flex flex-col gap-2 font-mono">
+                    <div>
+                      <div className="text-[11px] font-bold text-slate-100 flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_6px_#38bdf8]" />
+                        1.32 <small className="text-[9px] text-slate-400">OF 2.0 GB</small>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-[11px] font-bold text-slate-100 flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-pink-500 shadow-[0_0_6px_#ec4899]" />
+                        46 <small className="text-[9px] text-slate-400">TOK/SEC</small>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* SECTION C: Column 2 (Action Controls) - col-span-3 */}
+              <section className="col-span-3 grid grid-cols-2 gap-2.5">
+                <button
+                  onClick={toggleVoice}
+                  className={`bg-[#161b22] border rounded-xl p-3 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all shadow-md ${
+                    isTalking
+                      ? 'border-pink-500 bg-pink-500/10 text-pink-400 shadow-[0_0_12px_rgba(236,72,153,0.3)]'
+                      : 'border-teal-500/10 hover:border-teal-500/40 hover:bg-[#1f242d] text-slate-200'
+                  }`}
+                >
+                  <Mic className="w-5 h-5 text-pink-400" />
+                  <span className="font-mono font-bold text-[11px] text-center">RECON (VOICE)</span>
+                </button>
+
+                <button
+                  onClick={() => handleSend()}
+                  className="bg-[#161b22] border border-teal-500/10 hover:border-amber-500/50 hover:bg-[#1f242d] text-slate-200 rounded-xl p-3 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all shadow-md active:scale-95 group"
+                >
+                  <Zap className="w-5 h-5 text-amber-400 group-hover:scale-110 transition-transform" />
+                  <span className="font-mono font-bold text-[11px] text-center">ENGAGE</span>
+                </button>
+
+                <button
+                  onClick={() => handleSend('Regenerate system response.')}
+                  className="bg-[#161b22] border border-teal-500/10 hover:border-teal-400/50 hover:bg-[#1f242d] text-slate-200 rounded-xl p-3 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all shadow-md active:scale-95 group"
+                >
+                  <RotateCw className="w-5 h-5 text-teal-400 group-hover:rotate-45 transition-transform" />
+                  <span className="font-mono font-bold text-[11px] text-center">REGEN</span>
+                </button>
+
+                <button
+                  onClick={() => setIsMuted(!isMuted)}
+                  className={`bg-[#161b22] border rounded-xl p-3 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all shadow-md ${
+                    isMuted
+                      ? 'border-rose-500 bg-rose-500/10 text-rose-400 shadow-[0_0_12px_rgba(244,63,94,0.3)]'
+                      : 'border-teal-500/10 hover:border-teal-500/40 hover:bg-[#1f242d] text-slate-200'
+                  }`}
+                >
+                  <VolumeX className="w-5 h-5 text-rose-400" />
+                  <span className="font-mono font-bold text-[11px] text-center">
+                    {isMuted ? 'MUTED' : 'MUTE'}
+                  </span>
+                </button>
+              </section>
+
+              {/* SECTION D: Column 3 (Neural Stream Output) - col-span-6 */}
+              <section className="col-span-6 bg-[#161b22]/70 border border-teal-500/10 rounded-xl p-3.5 flex flex-col justify-between flex-1 min-h-0 relative overflow-hidden bg-hud-grid">
+                <div className="flex items-center justify-between border-b border-teal-500/10 pb-2 flex-shrink-0">
+                  <span className="font-mono text-xs font-bold text-teal-400 tracking-wider flex items-center gap-1.5">
+                    <Terminal className="w-3.5 h-3.5" /> RIGEL NEURAL STREAM
+                  </span>
+                  <span className="font-mono text-[10px] text-slate-500">ø13_49</span>
+                </div>
+
+                {/* Message Log Stream */}
+                <div className="flex-1 overflow-y-auto py-2.5 my-1 flex flex-col gap-2 font-mono text-xs pr-1">
+                  {messages.map((m, idx) => (
+                    <div
+                      key={m.id}
+                      className={`p-2.5 rounded-lg border leading-relaxed ${
+                        m.sender === 'user'
+                          ? 'bg-[#1e232a] border-amber-500/30 text-amber-100 self-end max-w-[85%]'
+                          : 'bg-[#0d1117] border-teal-500/30 text-slate-200 self-start max-w-[95%]'
+                      }`}
+                    >
+                      <div className="text-[10px] font-bold mb-1 flex items-center gap-1">
+                        {m.sender === 'user' ? (
+                          <span className="text-amber-400">► USER</span>
+                        ) : (
+                          <span className="text-teal-400">❖ COMPANION</span>
+                        )}
+                      </div>
+                      {idx === messages.length - 1 && m.sender === 'companion' ? (
+                        <TypewriterText text={m.text} speed={20} />
+                      ) : (
+                        <span>{m.text}</span>
+                      )}
+                    </div>
+                  ))}
+                  {isThinking && (
+                    <div className="p-2.5 rounded-lg border bg-[#0d1117] border-teal-500/30 text-teal-300 self-start">
+                      <div className="text-[10px] font-bold mb-1 text-teal-400">❖ COMPANION</div>
+                      <span className="animate-pulse">⚡ Processing neural output...</span>
+                    </div>
+                  )}
+                  <div ref={chatEndRef} />
+                </div>
+
+                {/* Terminal Prompt Input Bar */}
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleSend();
+                  }}
+                  className="border-b border-teal-500/30 focus-within:border-teal-400 bg-transparent text-xs font-mono text-slate-100 flex items-center gap-2 px-1 py-1.5 flex-shrink-0 transition-colors"
+                >
+                  <span className="text-teal-400 font-bold text-sm">►</span>
+                  <input
+                    type="text"
+                    className="w-full bg-transparent border-none outline-none text-slate-100 placeholder:text-slate-600 font-mono text-xs"
+                    placeholder="Ask your AI companion..."
+                    value={inputText}
+                    onChange={(e) => setInputText(e.target.value)}
+                  />
+                  <button
+                    type="submit"
+                    className="text-teal-400 hover:text-teal-300 font-bold text-xs px-2 py-0.5 rounded transition-colors cursor-pointer"
+                  >
+                    SEND
+                  </button>
+                </form>
+              </section>
+            </main>
+
+            {/* SECTION A: Bottom Status Footer */}
+            <footer className="h-[32px] px-6 flex items-center justify-between border-t border-teal-500/10 bg-[#161b22]/30 text-[11px] font-mono text-slate-400 opacity-80 flex-shrink-0">
+              <div>
+                CYCLES <span className="text-teal-400 font-semibold">13,607</span>
+              </div>
+              <div>
+                SPECTRUM <span className="text-teal-400 font-semibold">136 AQI</span>
+              </div>
+              <div>
+                STATUS <span className="text-teal-400 font-semibold">POTENT</span>
+              </div>
+            </footer>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
