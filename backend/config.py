@@ -1,6 +1,12 @@
 import os
+from pathlib import Path
 from typing import List
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Ensure default cache paths are local and not pointing to missing drive letters
+DEFAULT_CACHE_DIR = str(Path.home() / ".cache" / "huggingface")
+if "HF_HOME" not in os.environ or os.environ["HF_HOME"].startswith("E:"):
+    os.environ["HF_HOME"] = DEFAULT_CACHE_DIR
 
 class Settings(BaseSettings):
     """Configuration settings for the AI Companion Device."""
@@ -18,13 +24,14 @@ class Settings(BaseSettings):
     CHANNELS: int = 1
     CHUNK_SIZE: int = 1024
     
-    # Speech-to-Text (STT) Settings
-    WHISPER_MODEL_SIZE: str = "base"
+    # Speech-to-Text (STT) Settings - 100% Offline with Faster-Whisper
+    WHISPER_MODEL_SIZE: str = "tiny.en"
     WHISPER_DEVICE: str = "cpu"
     WHISPER_COMPUTE_TYPE: str = "int8"
+    WHISPER_DOWNLOAD_ROOT: str = str(Path.home() / ".cache" / "huggingface" / "hub")
     
-    # LLM Settings (Ollama)
-    OLLAMA_BASE_URL: str = "http://localhost:11434"
+    # LLM Settings (Ollama - 100% Offline Local Model)
+    OLLAMA_BASE_URL: str = "http://127.0.0.1:11435"
     OLLAMA_MODEL: str = "llama3.2:1b"
     SYSTEM_PROMPT: str = (
         "You are an embedded hardware AI companion assistant running on a touch-screen device. "

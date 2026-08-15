@@ -3,8 +3,13 @@ import os
 import wave
 import asyncio
 import logging
+from pathlib import Path
 from typing import AsyncGenerator, Dict, Any, List, Optional
 import numpy as np
+
+# Ensure HF_HOME is safe
+if "HF_HOME" not in os.environ or os.environ["HF_HOME"].startswith("E:"):
+    os.environ["HF_HOME"] = str(Path.home() / ".cache" / "huggingface")
 
 # PyAudio optional import for hardware mic/speaker access
 try:
@@ -32,23 +37,25 @@ from backend.config import settings
 logger = logging.getLogger("VoicePipeline")
 
 class VoicePipeline:
-    """Voice interaction pipeline combining STT (Faster-Whisper) and TTS streaming."""
+    """100% Offline Voice interaction pipeline combining STT (Faster-Whisper) and TTS."""
 
     def __init__(self):
         self.stt_model: Optional[Any] = None
         self._init_stt()
 
     def _init_stt(self):
-        """Initialize Faster-Whisper model lazily or on startup."""
+        """Initialize Faster-Whisper model locally for offline voice transcription."""
         if HAS_FASTER_WHISPER:
             try:
+                download_root = getattr(settings, 'WHISPER_DOWNLOAD_ROOT', str(Path.home() / ".cache" / "huggingface" / "hub"))
                 logger.info(f"Loading Faster-Whisper model '{settings.WHISPER_MODEL_SIZE}' on {settings.WHISPER_DEVICE}...")
                 self.stt_model = WhisperModel(
                     settings.WHISPER_MODEL_SIZE,
                     device=settings.WHISPER_DEVICE,
-                    compute_type=settings.WHISPER_COMPUTE_TYPE
+                    compute_type=settings.WHISPER_COMPUTE_TYPE,
+                    download_root=download_root
                 )
-                logger.info("Faster-Whisper model loaded successfully.")
+                logger.info("Faster-Whisper model loaded successfully (Offline STT ready).")
             except Exception as e:
                 logger.warning(f"Could not initialize Faster-Whisper model: {e}. Falling back to dynamic audio mock.")
                 self.stt_model = None
@@ -77,13 +84,12 @@ class VoicePipeline:
         return devices
 
     async def transcribe_audio_bytes(self, audio_data: bytes, format: str = "wav") -> str:
-        """Transcribe raw audio bytes into text using faster-whisper."""
+        """Transcribe raw audio bytes into text using faster-whisper 100% offline."""
         if not audio_data:
             return ""
 
         if self.stt_model and HAS_FASTER_WHISPER:
             try:
-                # Run transcription in threadpool to avoid blocking async event loop
                 loop = asyncio.get_running_loop()
                 def _do_transcribe():
                     audio_stream = io.BytesIO(audio_data)
@@ -101,7 +107,6 @@ class VoicePipeline:
                 logger.error(f"Error transcribing audio with Faster-Whisper: {e}")
                 return "[Error processing audio transcription]"
         
-        # Fallback transcription if faster-whisper is not loaded
         logger.info("Using STT fallback for raw audio stream processing.")
         return "System diagnostic check: Please verify device mic input and code status."
 
@@ -109,7 +114,6 @@ class VoicePipeline:
         """Generate PCM audio stream bytes for TTS streaming / waveform visualizer."""
         sample_rate = settings.SAMPLE_RATE
         t = np.linspace(0, duration_sec, int(sample_rate * duration_sec), False)
-        # 440Hz tone with decaying envelope
         envelope = np.exp(-3 * t)
         audio = (np.sin(2 * np.pi * freq * t) * envelope * 32767).astype(np.int16)
         
@@ -126,10 +130,8 @@ class VoicePipeline:
         if not text:
             return b""
         
-        # Generates a sound wave PCM artifact for real-time hardware voice readback streaming
         loop = asyncio.get_running_loop()
         def _generate():
-            # Standard synth tone sequence matching speech packet length
             num_words = len(text.split())
             duration = min(max(num_words * 0.15, 0.4), 4.0)
             return self.generate_sine_wave_pcm(duration_sec=duration, freq=520.0)

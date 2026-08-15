@@ -80,13 +80,14 @@ export default function App() {
     {
       id: 1,
       sender: 'companion',
-      text: 'AI COMPANION ONLINE: Neural core active. Voice & telemetry systems ready.'
+      text: 'AI COMPANION ONLINE: 100% Offline Local Neural Core Active. Whisper STT & Llama 3.2 ready.'
     }
   ]);
   const [inputText, setInputText] = useState('');
 
   const chatEndRef = useRef(null);
-  const recognitionRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
 
   // Sync IPC state
   useEffect(() => {
@@ -106,10 +107,7 @@ export default function App() {
     }
   }, []);
 
-  /* ============================================================
-     OBJECTIVE 4: State Handshake Logic
-     ============================================================ */
-  // Expanding: Resize window to 1150x420 FIRST (for shadow padding), then expand UI
+  // Handshake Logic: Resize window before expanding, delay resize on collapse
   const handleExpand = async () => {
     if (window.electronAPI?.resizeWindow) {
       await window.electronAPI.resizeWindow(1150, 420);
@@ -117,7 +115,6 @@ export default function App() {
     setIsExpanded(true);
   };
 
-  // Shrinking: Run Framer Motion exit animation FIRST, wait 400ms, then resize window to 160x60
   const handleCollapse = () => {
     setIsExpanded(false);
     setTimeout(async () => {
@@ -134,7 +131,7 @@ export default function App() {
     }
   }, [messages, isThinking, isExpanded]);
 
-  // Spoken TTS
+  // Spoken TTS (Uses offline Windows SAPI5 system voices)
   const speakText = (text) => {
     if (isMuted) return;
     if ('speechSynthesis' in window) {
@@ -152,7 +149,7 @@ export default function App() {
     }
   };
 
-  // Handle Send LLM Chat
+  // Handle Send LLM Chat (Local Ollama API)
   const handleSend = async (customPrompt) => {
     const prompt = customPrompt || inputText;
     if (!prompt.trim() || isThinking) return;
@@ -182,59 +179,76 @@ export default function App() {
       setIsThinking(false);
       setIsTalking(false);
       setIsSpeakingTTS(false);
-      const fallback = '[ALERT] Rigel neural stream warning. Local backend offline.';
+      const fallback = '[ALERT] Local backend offline. Ensure Ollama service is active on port 11435.';
       setMessages((prev) => [...prev, { id: Date.now() + 2, sender: 'companion', text: fallback }]);
-      speakText('Connection warning.');
+      speakText('Local backend warning.');
     }
   };
 
-  // Mic Recon Toggle
-  const toggleVoice = () => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      handleSend('Give me a diagnostic status update.');
-      return;
-    }
-
+  // 100% Offline Voice Recording with Local Faster-Whisper Pipeline
+  const toggleVoice = async () => {
     if (isTalking) {
-      window.speechSynthesis?.cancel();
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+        mediaRecorderRef.current.stop();
+      }
       setIsTalking(false);
-      setIsSpeakingTTS(false);
       return;
-    }
-
-    if (!recognitionRef.current) {
-      const rec = new SpeechRecognition();
-      rec.continuous = false;
-      rec.interimResults = false;
-      rec.lang = 'en-US';
-
-      rec.onstart = () => setIsTalking(true);
-      rec.onresult = (e) => {
-        const text = e.results[0][0].transcript;
-        setIsTalking(false);
-        if (text) handleSend(text);
-      };
-      rec.onerror = () => setIsTalking(false);
-      rec.onend = () => setIsTalking(false);
-      recognitionRef.current = rec;
     }
 
     try {
-      recognitionRef.current.start();
-    } catch {
-      setIsTalking(false);
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioChunksRef.current = [];
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
+        stream.getTracks().forEach((track) => track.stop());
+
+        setIsThinking(true);
+        try {
+          const formData = new FormData();
+          formData.append('file', audioBlob, 'mic.wav');
+
+          const res = await fetch('http://localhost:8000/api/stt', {
+            method: 'POST',
+            body: formData
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            setIsThinking(false);
+            if (data.transcript && data.transcript.trim() && !data.transcript.includes('[Inaudible')) {
+              handleSend(data.transcript);
+            }
+          } else {
+            setIsThinking(false);
+          }
+        } catch (err) {
+          setIsThinking(false);
+          console.error("Local Whisper STT Error:", err);
+        }
+      };
+
+      mediaRecorder.start();
+      setIsTalking(true);
+    } catch (err) {
+      console.warn("Direct microphone recording fallback:", err);
+      handleSend('Give me a diagnostic status update.');
     }
   };
 
   return (
-    /* Safe Area Root Container: Transparent root flexbox matching window size */
     <div className="w-full h-full flex items-center justify-center bg-transparent select-none p-2 overflow-hidden">
       <AnimatePresence mode="wait">
         {!isExpanded ? (
-          /* ============================================================
-             OBJECTIVE 2: Upgraded "Docked" State (140px × 40px inside 160x60)
-             ============================================================ */
+          /* Upgraded "Docked" State (140x40 inside 160x60) */
           <motion.div
             key="docked-pill"
             layoutId="dynamic-island"
@@ -246,7 +260,7 @@ export default function App() {
             className="w-[140px] h-[40px] rounded-full bg-[#0d1117]/90 backdrop-blur-md border border-teal-500/30 shadow-lg shadow-teal-500/10 cursor-pointer flex items-center justify-center gap-2.5 px-3 hover:border-teal-400/60 hover:shadow-teal-500/20 transition-all select-none group"
             title="Click to expand AI Companion"
           >
-            {/* Tactical Telemetry Glowing Gauge */}
+            {/* Tactical Telemetry Circular Gauge */}
             <div className="relative w-4 h-4 flex items-center justify-center">
               <motion.div
                 animate={{ opacity: [0.4, 1, 0.4], scale: [0.9, 1.15, 0.9] }}
@@ -267,9 +281,7 @@ export default function App() {
             </span>
           </motion.div>
         ) : (
-          /* ============================================================
-             OBJECTIVE 3: Expanded "Landscape Dashboard" (1113px × 385px)
-             ============================================================ */
+          /* Expanded Landscape Dashboard (1113px × 385px) */
           <motion.div
             key="expanded-dashboard"
             layoutId="dynamic-island"
@@ -286,13 +298,13 @@ export default function App() {
                   <span className="text-teal-400">◆</span> AI COMPANION
                 </span>
                 <span className="bg-teal-500/10 border border-teal-500/30 text-teal-300 text-[10px] px-2 py-0.5 rounded-full font-mono font-semibold">
-                  LLM 1B
+                  LLM 1B (OFFLINE)
                 </span>
               </div>
 
               <div className="flex items-center gap-3">
                 <span className="bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs px-2.5 py-0.5 rounded-md font-mono font-semibold tracking-wide">
-                  {isThinking ? 'COMPUTING' : isTalking ? 'LISTENING' : isSpeakingTTS ? 'TRANSMITTING' : 'STEADY'}
+                  {isThinking ? 'COMPUTING' : isTalking ? 'LISTENING (WHISPER)' : isSpeakingTTS ? 'TRANSMITTING' : 'STEADY'}
                 </span>
                 <button
                   onClick={handleCollapse}
@@ -304,11 +316,10 @@ export default function App() {
               </div>
             </header>
 
-            {/* 3-Column CSS Grid Main Area */}
+            {/* 3-Column Grid */}
             <main className="grid grid-cols-12 gap-4 p-4 flex-1 min-h-0">
-              {/* Column 1 (Hardware & Telemetry) - col-span-3 */}
+              {/* Column 1 */}
               <section className="col-span-3 flex flex-col gap-3">
-                {/* 51 dB Active EQ Meter Card */}
                 <div className="bg-[#161b22]/80 border border-teal-500/10 rounded-xl p-3.5 flex flex-col gap-2.5">
                   <div className="flex items-center justify-between">
                     <span className="font-mono font-bold text-sm text-slate-100 flex items-baseline gap-1">
@@ -318,23 +329,18 @@ export default function App() {
                       ACTIVE
                     </span>
                   </div>
-
-                  {/* Framer Motion Active EQ Meter */}
                   <AnimatedEQMeter isTalking={isTalking} isThinking={isThinking} isSpeaking={isSpeakingTTS} />
                 </div>
 
-                {/* Circular Ring Chart (1.32 OF 2.0 GB & 46 TOK/SEC) */}
                 <div className="bg-[#161b22]/80 border border-teal-500/10 rounded-xl p-3.5 flex items-center gap-4 flex-1">
                   <div className="relative w-16 h-16 flex-shrink-0 flex items-center justify-center">
                     <svg viewBox="0 0 80 80" className="w-full h-full transform -rotate-90">
-                      {/* Outer Ring: Neon Cyan (RAM) */}
                       <circle cx="40" cy="40" r="32" fill="none" stroke="#1f2937" strokeWidth="6" />
                       <circle
                         cx="40" cy="40" r="32" fill="none" stroke="#38bdf8" strokeWidth="6"
                         strokeDasharray="201" strokeDashoffset={201 - 201 * 0.66}
                         strokeLinecap="round" className="shadow-[0_0_10px_#38bdf8]"
                       />
-                      {/* Inner Ring: Neon Pink (Tokens) */}
                       <circle cx="40" cy="40" r="22" fill="none" stroke="#1f2937" strokeWidth="6" />
                       <circle
                         cx="40" cy="40" r="22" fill="none" stroke="#ec4899" strokeWidth="6"
@@ -345,35 +351,33 @@ export default function App() {
                   </div>
 
                   <div className="flex flex-col gap-2 font-mono">
-                    <div>
-                      <div className="text-[11px] font-bold text-slate-100 flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_6px_#38bdf8]" />
-                        1.32 <small className="text-[9px] text-slate-400">OF 2.0 GB</small>
-                      </div>
+                    <div className="text-[11px] font-bold text-slate-100 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_6px_#38bdf8]" />
+                      1.32 <small className="text-[9px] text-slate-400">OF 2.0 GB</small>
                     </div>
-
-                    <div>
-                      <div className="text-[11px] font-bold text-slate-100 flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-pink-500 shadow-[0_0_6px_#ec4899]" />
-                        46 <small className="text-[9px] text-slate-400">TOK/SEC</small>
-                      </div>
+                    <div className="text-[11px] font-bold text-slate-100 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-pink-500 shadow-[0_0_6px_#ec4899]" />
+                      46 <small className="text-[9px] text-slate-400">TOK/SEC</small>
                     </div>
                   </div>
                 </div>
               </section>
 
-              {/* Column 2 (Action Controls) - col-span-3 */}
+              {/* Column 2 */}
               <section className="col-span-3 grid grid-cols-2 gap-2.5">
                 <button
                   onClick={toggleVoice}
                   className={`bg-[#161b22] border rounded-xl p-3 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all shadow-md ${
                     isTalking
-                      ? 'border-pink-500 bg-pink-500/10 text-pink-400 shadow-[0_0_12px_rgba(236,72,153,0.3)]'
+                      ? 'border-pink-500 bg-pink-500/10 text-pink-400 shadow-[0_0_12px_rgba(236,72,153,0.3)] animate-pulse'
                       : 'border-teal-500/10 hover:border-teal-500/40 hover:bg-[#1f242d] text-slate-200'
                   }`}
+                  title={isTalking ? 'Click to stop recording & transcribe with Whisper' : 'Click to start voice recording'}
                 >
-                  <Mic className="w-5 h-5 text-pink-400" />
-                  <span className="font-mono font-bold text-[11px] text-center">RECON (VOICE)</span>
+                  <Mic className={`w-5 h-5 ${isTalking ? 'text-pink-400 scale-110' : 'text-teal-400'}`} />
+                  <span className="font-mono font-bold text-[11px] text-center">
+                    {isTalking ? 'STOP (REC)' : 'RECON (VOICE)'}
+                  </span>
                 </button>
 
                 <button
@@ -407,7 +411,7 @@ export default function App() {
                 </button>
               </section>
 
-              {/* Column 3 (Neural Stream Output) - col-span-6 */}
+              {/* Column 3 */}
               <section className="col-span-6 bg-[#161b22]/70 border border-teal-500/10 rounded-xl p-3.5 flex flex-col justify-between flex-1 min-h-0 relative overflow-hidden bg-hud-grid">
                 <div className="flex items-center justify-between border-b border-teal-500/10 pb-2 flex-shrink-0">
                   <span className="font-mono text-xs font-bold text-teal-400 tracking-wider flex items-center gap-1.5">
@@ -416,7 +420,6 @@ export default function App() {
                   <span className="font-mono text-[10px] text-slate-500">ø13_49</span>
                 </div>
 
-                {/* Message Log Stream */}
                 <div className="flex-1 overflow-y-auto py-2.5 my-1 flex flex-col gap-2 font-mono text-xs pr-1">
                   {messages.map((m, idx) => (
                     <div
@@ -444,13 +447,12 @@ export default function App() {
                   {isThinking && (
                     <div className="p-2.5 rounded-lg border bg-[#0d1117] border-teal-500/30 text-teal-300 self-start">
                       <div className="text-[10px] font-bold mb-1 text-teal-400">❖ COMPANION</div>
-                      <span className="animate-pulse">⚡ Processing neural output...</span>
+                      <span className="animate-pulse">⚡ Processing offline neural output...</span>
                     </div>
                   )}
                   <div ref={chatEndRef} />
                 </div>
 
-                {/* Terminal Prompt Input Bar */}
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
@@ -476,7 +478,7 @@ export default function App() {
               </section>
             </main>
 
-            {/* Bottom Status Footer */}
+            {/* Footer */}
             <footer className="h-[32px] px-6 flex items-center justify-between border-t border-teal-500/10 bg-[#161b22]/30 text-[11px] font-mono text-slate-400 opacity-80 flex-shrink-0">
               <div>
                 CYCLES <span className="text-teal-400 font-semibold">13,607</span>
