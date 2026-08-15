@@ -36,6 +36,9 @@ from backend.config import settings
 
 logger = logging.getLogger("VoicePipeline")
 
+class VoicePipeline:
+    """100% Offline Voice interaction pipeline combining STT (Faster-Whisper) and TTS."""
+
     def __init__(self):
         self.stt_model: Optional[Any] = None
         self.tts_engine: Optional[Any] = None
