@@ -124,6 +124,31 @@ export default function App() {
     }, 400);
   };
 
+  const [selectedVoice, setSelectedVoice] = useState(null);
+
+  // Auto-detect and select offline female voice (Microsoft Zira, Jenny, Samantha, etc.)
+  useEffect(() => {
+    const updateVoice = () => {
+      if ('speechSynthesis' in window) {
+        const voices = window.speechSynthesis.getVoices();
+        if (voices.length > 0) {
+          const femaleVoice = voices.find((v) =>
+            /zira|female|jenny|eva|aria|samantha|victoria|karen|susan/i.test(v.name)
+          ) || voices.find((v) =>
+            v.lang.startsWith('en') && !/david|male|mark|george/i.test(v.name)
+          ) || voices[0];
+
+          setSelectedVoice(femaleVoice);
+        }
+      }
+    };
+
+    updateVoice();
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.onvoiceschanged = updateVoice;
+    }
+  }, []);
+
   // Auto-scroll chat
   useEffect(() => {
     if (isExpanded) {
@@ -131,15 +156,18 @@ export default function App() {
     }
   }, [messages, isThinking, isExpanded]);
 
-  // Spoken TTS (Uses offline Windows SAPI5 system voices)
+  // Spoken TTS (Uses offline female voice)
   const speakText = (text) => {
     if (isMuted) return;
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
       const clean = text.replace(/[\*\_#\`]/g, '');
       const utterance = new SpeechSynthesisUtterance(clean);
-      utterance.rate = 1.0;
-      utterance.pitch = 0.95;
+      if (selectedVoice) {
+        utterance.voice = selectedVoice;
+      }
+      utterance.rate = 1.02;
+      utterance.pitch = 1.08; // Clear, pleasant female tone
 
       utterance.onstart = () => setIsSpeakingTTS(true);
       utterance.onend = () => setIsSpeakingTTS(false);

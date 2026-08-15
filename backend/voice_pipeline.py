@@ -36,12 +36,26 @@ from backend.config import settings
 
 logger = logging.getLogger("VoicePipeline")
 
-class VoicePipeline:
-    """100% Offline Voice interaction pipeline combining STT (Faster-Whisper) and TTS."""
-
     def __init__(self):
         self.stt_model: Optional[Any] = None
+        self.tts_engine: Optional[Any] = None
         self._init_stt()
+        self._init_tts()
+
+    def _init_tts(self):
+        """Initialize offline TTS engine with female voice (Microsoft Zira)."""
+        if HAS_PYTTSX3:
+            try:
+                self.tts_engine = pyttsx3.init()
+                self.tts_engine.setProperty('rate', settings.TTS_RATE)
+                voices = self.tts_engine.getProperty('voices')
+                for v in voices:
+                    if 'zira' in v.name.lower() or 'female' in getattr(v, 'gender', '').lower():
+                        self.tts_engine.setProperty('voice', v.id)
+                        logger.info(f"Offline TTS voice set to female: {v.name}")
+                        break
+            except Exception as e:
+                logger.warning(f"Could not configure pyttsx3 voice: {e}")
 
     def _init_stt(self):
         """Initialize Faster-Whisper model locally for offline voice transcription."""
