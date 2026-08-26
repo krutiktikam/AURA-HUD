@@ -1,89 +1,150 @@
-# Hardware AI Companion Device (Dynamic Island Edition)
+# 🌌 Tactical AI Companion (Dynamic HUD Edition)
 
-A complete, production-ready software stack for a local hardware-based AI companion device featuring an iPhone-style **Dynamic Island** desktop UI, real-time voice interaction, and an Okudagram retro-futuristic telemetry dashboard.
+A high-performance, **100% local and offline** desktop AI companion widget built with **Electron**, **React (Vite + Tailwind CSS + Framer Motion)**, and a **FastAPI + Ollama + Faster-Whisper** backend.
 
----
-
-## 🌟 Features
-
-- **Dynamic Island Desktop App (Electron)**:
-  - **Compact Pill State (120px × 40px)**: Sleek top-center floating pill showing minimal connection status, voice wave activity, and thinking spinner.
-  - **Expanded Dashboard State (400px × 320px)**: Expands into full Okudagram dashboard with rotating 3D orbital canvas, SVG segmented dial, vertical controls, and neural chat.
-  - **Global Hotkey & Tray**: Press `Ctrl+Shift+Y` to toggle island state, or click outside the window to automatically collapse to pill mode.
-- **Offline Local LLM Engine**: Powered by Ollama (`llama3.2:1b` or custom models) for private, zero-latency responses.
-- **Voice Interactivity**: Speech-to-Text (`faster-whisper`) and text-to-speech audio synthesis out loud.
-- **Real-Time WebSockets**: Low-latency audio streaming and system telemetry outputs.
+Featuring a top-of-screen floating **Dynamic Island** with smooth spring-physics morphing between a docked tactical telemetry pill and an expansive sci-fi landscape HUD.
 
 ---
 
-## 📂 Clean Project Architecture
+## ⚡ Key Highlights
+
+- **🏝️ Dynamic Island Window Morphing**:
+  - **Docked State (`140px × 40px` inside `160px × 60px` safe area)**: Sleek top-center floating pill featuring an animated glowing telemetry circular gauge and dynamic status indicator.
+  - **Expanded Landscape Dashboard (`1113px × 385px`)**: Tactical sci-fi HUD with dark glassmorphism (`bg-[#0d1117]/95`), backdrop blur, cyan/teal accent borders, and a HUD grid background.
+  - **Zero-Clipping Mail-Slot Handshake**: Electron dynamically resizes the invisible transparent window boundaries (`160x60` ➔ `1150x420`) before expanding and delays shrinking until after Framer Motion exit animations complete (`stiffness: 350, damping: 25`).
+- **🔒 100% Private, Local & Offline**:
+  - **Brain (LLM)**: Offline local inference powered by Ollama (`llama3.2:1b`, `deepseek-r1:1.5b`, or any Ollama model) on port `11435`.
+  - **Ears (STT)**: On-device `MediaRecorder` audio capture transcribed 100% offline using `faster-whisper-tiny.en` running on CPU/GPU via CTranslate2.
+  - **Mouth (TTS)**: Offline female voice synthesis (`Microsoft Zira Desktop` / English female SAPI5 voices) with customized pitch and rate.
+- **📊 Sci-Fi Tactical Telemetry HUD Components**:
+  - **Header & Footer**: Live system cycles (`CYCLES 13,607`), environmental telemetry (`SPECTRUM 136 AQI`), status badge (`STEADY`), and model identifier (`LLM 1B (OFFLINE)`).
+  - **Hardware & Audio Visualizer**: 16-bar active volume EQ meter (`51 dB`) + dual concentric SVG ring gauge tracking memory and token velocity (`1.32 OF 2.0 GB` & `46 TOK/SEC`).
+  - **Tactical Action Controls**: 2x2 interactive button matrix (`RECON (VOICE)`, `ENGAGE`, `REGEN`, `MUTE`).
+  - **Rigel Neural Stream**: Real-time typewriter animated text stream, historical conversation feed, and terminal prompt input.
+- **⌨️ Global Shortcuts & Auto-Collapse**: Press `Ctrl+Shift+Y` anywhere to toggle or click outside the window (Blur event) to automatically collapse into pill mode.
+
+---
+
+## 🏗️ Architecture Overview
+
+```mermaid
+graph TD
+    User([User Voice / Text]) -->|Click / Record| ReactUI[React Frontend - Framer Motion HUD]
+    ReactUI -->|IPC Resize & State| ElectronMain[Electron Main Process]
+    ReactUI -->|POST /api/chat| FastAPIServer[FastAPI Local Backend :8000]
+    ReactUI -->|POST /api/stt WAV Blob| FastAPIServer
+    FastAPIServer -->|Local Inference| Ollama[Local Ollama LLM Service :11435]
+    FastAPIServer -->|CTranslate2 Audio Transcribe| Whisper[Faster-Whisper Local Model]
+    Ollama -->|Streamed Response| FastAPIServer -->|JSON Response| ReactUI
+    ReactUI -->|Offline SAPI5 Female Voice| AudioOut([Audio Output - Microsoft Zira])
+```
+
+---
+
+## 📂 Project Directory Structure
 
 ```text
 ai-companion-device/
-├── main.js                  # Electron main process (Dynamic Island IPC & window management)
-├── preload.js               # Secure IPC contextBridge preload script
-├── start-companion.bat      # 1-click automated batch launcher
-├── package.json             # Electron & root launcher scripts
+├── main.js                  # Electron main process (Window management & dynamic safe area resizing)
+├── preload.js               # Secure contextBridge IPC bridge (resizeWindow, windowState)
+├── start-companion.bat      # 1-Click launcher (Port cleanup, Ollama, Backend, Vite, Electron)
+├── package.json             # Root workspace scripts & Electron dependencies
 ├── backend/
-│   ├── main.py              # FastAPI server, REST & WebSocket endpoints
-│   ├── ai_engine.py         # Ollama LLM integration & streaming engine
-│   ├── voice_pipeline.py    # Speech-To-Text (Faster-Whisper) & TTS synth
-│   └── config.py            # Pydantic configuration & environment settings
+│   ├── main.py              # FastAPI server, REST & WebSocket routes
+│   ├── ai_engine.py         # Ollama LLM streaming client & offline health checks
+│   ├── voice_pipeline.py    # Offline Faster-Whisper STT & pyttsx3 voice synthesis
+│   └── config.py            # Pydantic configuration, model paths & cache settings
 ├── ui/
-│   ├── index.html           # HTML template
-│   ├── package.json         # React UI Node.js dependencies
-│   ├── vite.config.js       # Vite build & server config
+│   ├── index.html           # HTML5 transparent shell template
+│   ├── package.json         # React UI dependencies (Framer Motion, Lucide, Tailwind CSS)
+│   ├── vite.config.js       # Vite configuration with Tailwind CSS plugin
 │   └── src/
-│       ├── main.jsx         # React DOM root entry point
-│       ├── App.jsx          # Dynamic Island & Okudagram React UI component
-│       └── styles.css       # Glassmorphism & Okudagram styling
+│       ├── main.jsx         # React application bootstrap entry
+│       ├── App.jsx          # Complete Dynamic Island & Landscape HUD Component
+│       └── styles.css       # Tailwind imports, HUD grid background & scrollbars
 ├── requirements.txt         # Python dependencies
-├── .env.example             # Example environment variables template
-└── README.md                # Project documentation & execution guide
+├── .env.example             # Environment variable template
+└── README.md                # Project documentation & full architecture summary
 ```
 
 ---
 
-## 🚀 Quickstart Guide
+## 🚀 Quickstart & Installation
 
-### 1-Click Automated Launch (Recommended)
-Simply double-click **`start-companion.bat`** (or run `.\start-companion.bat` in PowerShell).
+### Prerequisites
+1. **Node.js** (v18+)
+2. **Python** (3.10+)
+3. **Ollama** installed locally (`ollama pull llama3.2:1b`)
 
-This automatically cleans up ports, launches Ollama, starts the FastAPI backend, initializes Vite, and opens the Dynamic Island Electron app at the top of your screen!
+### 1. Initial Setup
+Clone the repository and install dependencies:
 
-### Manual Terminal Launch
-From the project root:
 ```powershell
-# Single-command concurrent startup:
-npm run dev
+# Install Node dependencies
+npm install
+cd ui && npm install && cd ..
+
+# Setup Python Virtual Environment
+python -m venv venv
+.\venv\Scripts\activate
+pip install -r requirements.txt
 ```
 
----
-
-## ⌨️ Controls & Shortcuts
-
-| Action | Shortcut / Trigger |
-| :--- | :--- |
-| **Expand / Collapse Island** | Click compact pill OR press `Ctrl+Shift+Y` |
-| **Collapse to Pill** | Click outside the window (Blur event) OR click top-right `✕` button |
-| **System Tray Menu** | Right-click taskbar tray icon for Show/Hide & Toggle options |
-| **Voice Push-To-Talk** | Click `recon (voice)` button in expanded panel |
+### 2. Launch the AI Companion (1-Click)
+Run the automated launcher batch script:
+```powershell
+.\start-companion.bat
+```
+*This automatically initializes the Ollama service on port 11435, starts the FastAPI Whisper backend on port 8000, boots the Vite frontend on port 3000, and displays the frameless transparent desktop HUD.*
 
 ---
 
-## 📡 API & WebSocket Specification
+## ⌨️ Controls & Keyboard Shortcuts
+
+| Action | Shortcut / Trigger | Description |
+| :--- | :--- | :--- |
+| **Expand HUD** | Click Docked Pill OR `Ctrl+Shift+Y` | Expands into full 1113x385 landscape tactical dashboard |
+| **Collapse HUD** | Click `✕` Button OR Click outside window | Smoothly shrinks dashboard back into top-center pill |
+| **Push-to-Talk (Offline STT)** | Click `RECON (VOICE)` | Records microphone audio and transcribes locally with Faster-Whisper |
+| **Engage LLM** | Click `ENGAGE` OR Press `Enter` | Sends the current prompt to the local Ollama LLM core |
+| **Regenerate Response** | Click `REGEN` | Requests a fresh diagnostic/response from the local model |
+| **Mute Voice Output** | Click `MUTE` | Toggles speech synthesis audio readback |
+
+---
+
+## 📡 REST & WebSocket API Reference
 
 | Endpoint | Type | Description |
 | :--- | :--- | :--- |
-| `GET /api/health` | REST | Checks system status, Ollama model availability & audio devices |
-| `GET /api/config` | REST | Retrieves active hardware and audio settings |
-| `POST /api/chat` | REST | Non-streaming text chat endpoint (`{ "prompt": "..." }`) |
-| `POST /api/stt` | REST | Upload WAV audio file for Whisper transcription |
-| `POST /api/tts` | REST | Synthesize text to speech audio WAV stream |
-| `WS /ws/audio` | WebSocket | Low-latency audio stream, STT transcription, and LLM text tokens |
-| `WS /ws/terminal` | WebSocket | Real-time hardware telemetry and server logs stream |
+| `GET /api/health` | REST | Verifies status of local Ollama model, Faster-Whisper, and audio hardware |
+| `GET /api/config` | REST | Retrieves active configuration settings and audio device topology |
+| `POST /api/chat` | REST | Sends prompt to local Ollama instance (`{ "prompt": "..." }`) |
+| `POST /api/stt` | REST | Multipart upload of audio file/blob for offline Faster-Whisper transcription |
+| `POST /api/tts` | REST | Synthesizes text to PCM audio stream |
+| `WS /ws/audio` | WebSocket | Real-time bidirectional voice streaming, transcription, and token delivery |
+| `WS /ws/terminal` | WebSocket | Real-time hardware telemetry and backend diagnostic logs |
+
+---
+
+## ⚙️ Customization & Model Switching
+
+### Changing the Local LLM Model
+To switch to another local model (e.g., DeepSeek R1 1.5B or Llama 3.2 3B):
+1. Pull the model in your terminal:
+   ```bash
+   ollama pull deepseek-r1:1.5b
+   # or
+   ollama pull llama3.2:3b
+   ```
+2. Update `OLLAMA_MODEL` in `backend/config.py`:
+   ```python
+   OLLAMA_MODEL: str = "deepseek-r1:1.5b"
+   ```
+
+### Changing Voice Profiles
+By default, the companion selects **Microsoft Zira Desktop** (Female SAPI5 voice). You can customize the pitch, rate, or voice profile in `ui/src/App.jsx` (`speakText` function) or in `backend/voice_pipeline.py`.
 
 ---
 
 ## 📄 License
-MIT License. Free for open hardware implementation and personal modification.
+MIT License. Free for open hardware prototyping, companion device casing, and personal enhancement.
