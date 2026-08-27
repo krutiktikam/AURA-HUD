@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from backend.config import settings
 from backend.ai_engine import ai_engine
 from backend.voice_pipeline import voice_pipeline
+from backend.agent import jarvis_agent
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("MainServer")
@@ -17,7 +18,7 @@ logger = logging.getLogger("MainServer")
 app = FastAPI(
     title=settings.APP_NAME,
     version="1.0.0",
-    description="Hardware AI Companion Backend Server with Real-time Voice & Touchscreen UI support"
+    description="Hardware AI Companion Backend Server with Real-time Voice, J.A.R.V.I.S. Agent & Touchscreen UI support"
 )
 
 # Enable CORS for hardware UI and web clients
@@ -53,6 +54,7 @@ async def root():
             "health": "/api/health",
             "config": "/api/config",
             "chat": "/api/chat",
+            "stt_live": "/api/stt/live",
             "ws_audio": "/ws/audio",
             "ws_terminal": "/ws/terminal"
         }
@@ -60,13 +62,18 @@ async def root():
 
 @app.get("/api/health")
 async def health_check():
-    """System health check including Ollama and audio devices."""
+    """System health check including Ollama, J.A.R.V.I.S. agent and audio devices."""
     ollama_status = await ai_engine.check_health()
     devices = voice_pipeline.get_audio_devices()
     return {
         "system": "OK",
         "timestamp": time.time(),
         "ollama": ollama_status,
+        "agent": {
+            "model": jarvis_agent.model,
+            "tools_count": len(jarvis_agent.tools),
+            "memory_turns": len(jarvis_agent.chat_history) // 2
+        },
         "audio": {
             "devices_count": len(devices),
             "input_index": settings.AUDIO_INPUT_DEVICE_INDEX,
@@ -86,8 +93,8 @@ async def get_config():
 
 @app.post("/api/chat")
 async def chat_endpoint(req: ChatRequest):
-    """REST endpoint for AI model response."""
-    response_text = await ai_engine.generate_response(req.prompt, req.history)
+    """AI chat endpoint using J.A.R.V.I.S. agent with local tools & memory."""
+    response_text = await jarvis_agent.ainvoke(req.prompt, req.history)
     return {"response": response_text}
 
 @app.post("/api/stt")
@@ -108,7 +115,7 @@ async def tts_endpoint(req: TTSRequest):
     }
 
 # --------------------------------------------------------------------------
-# WebSockets for Real-time Voice Interaction & Terminal Hardware Stream
+# WebSockets for Real-time Voice Interaction & Streaming
 # --------------------------------------------------------------------------
 
 class ConnectionManager:
@@ -141,96 +148,93 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-@app.websocket("/ws/audio")
-async def websocket_audio_endpoint(websocket: WebSocket):
-    """Real-time voice streaming websocket connection."""
+@app.websocket("/api/stt/live")
+async def websocket_stt_live(websocket: WebSocket):
+    """Real-time STT WebSocket endpoint with Faster-Whisper and J.A.R.V.I.S. agent."""
     await manager.connect_audio(websocket)
-    await manager.broadcast_terminal({
-        "type": "log",
-        "level": "INFO",
-        "source": "VOICE_WS",
-        "message": "Client voice stream connected."
-    })
-    
+
     try:
         while True:
-            # Receive either text command or binary PCM audio payload
             data = await websocket.receive()
-            
+
             if "bytes" in data and data["bytes"]:
-                # Process audio chunk
                 audio_bytes = data["bytes"]
-                transcript = await voice_pipeline.transcribe_audio_bytes(audio_bytes)
-                
-                await websocket.send_json({
-                    "event": "transcription",
-                    "text": transcript
-                })
-                
-                await manager.broadcast_terminal({
-                    "type": "stt",
-                    "level": "STT",
-                    "source": "WHISPER",
-                    "message": f"Recognized: '{transcript}'"
-                })
 
-                # Stream LLM response
-                await websocket.send_json({"event": "ai_start"})
-                full_reply = ""
-                async for token in ai_engine.generate_response_stream(transcript):
-                    full_reply += token
+                # Transcribe chunk with Faster-Whisper
+                transcript = await voice_pipeline.transcribe_stream(audio_bytes)
+
+                if transcript:
                     await websocket.send_json({
-                        "event": "ai_token",
-                        "token": token
+                        "event": "transcription",
+                        "text": transcript
                     })
-                
-                await websocket.send_json({
-                    "event": "ai_done",
-                    "full_text": full_reply
-                })
 
-                await manager.broadcast_terminal({
-                    "type": "llm",
-                    "level": "LLM",
-                    "source": "OLLAMA",
-                    "message": f"Generated {len(full_reply)} chars"
-                })
-
-            elif "text" in data and data["text"]:
-                payload = json.loads(data["text"])
-                msg_type = payload.get("type", "chat")
-                user_text = payload.get("prompt", "")
-
-                if msg_type == "chat":
+                    # Stream AI response
                     await websocket.send_json({"event": "ai_start"})
                     full_reply = ""
-                    async for token in ai_engine.generate_response_stream(user_text, payload.get("history")):
+                    async for token in ai_engine.generate_response_stream(transcript):
                         full_reply += token
                         await websocket.send_json({
                             "event": "ai_token",
                             "token": token
                         })
-                    
+
                     await websocket.send_json({
                         "event": "ai_done",
                         "full_text": full_reply
                     })
 
-                    await manager.broadcast_terminal({
-                        "type": "log",
-                        "level": "INFO",
-                        "source": "LLM",
-                        "message": f"Streamed response for prompt: '{user_text[:30]}...'"
+            elif "text" in data and data["text"]:
+                payload = json.loads(data["text"])
+                if payload.get("type") == "chat":
+                    prompt = payload.get("prompt", "")
+                    await websocket.send_json({"event": "ai_start"})
+                    full_reply = ""
+                    async for token in ai_engine.generate_response_stream(prompt, payload.get("history")):
+                        full_reply += token
+                        await websocket.send_json({
+                            "event": "ai_token",
+                            "token": token
+                        })
+                    await websocket.send_json({
+                        "event": "ai_done",
+                        "full_text": full_reply
                     })
 
     except WebSocketDisconnect:
         manager.disconnect_audio(websocket)
-        await manager.broadcast_terminal({
-            "type": "log",
-            "level": "WARN",
-            "source": "VOICE_WS",
-            "message": "Client voice stream disconnected."
-        })
+    except Exception as e:
+        logger.error(f"WebSocket live STT error: {e}")
+        manager.disconnect_audio(websocket)
+
+@app.websocket("/ws/audio")
+async def websocket_audio_endpoint(websocket: WebSocket):
+    """Real-time voice streaming websocket connection."""
+    await manager.connect_audio(websocket)
+    try:
+        while True:
+            data = await websocket.receive()
+            if "bytes" in data and data["bytes"]:
+                audio_bytes = data["bytes"]
+                transcript = await voice_pipeline.transcribe_audio_bytes(audio_bytes)
+                await websocket.send_json({"event": "transcription", "text": transcript})
+                await websocket.send_json({"event": "ai_start"})
+                full_reply = ""
+                async for token in ai_engine.generate_response_stream(transcript):
+                    full_reply += token
+                    await websocket.send_json({"event": "ai_token", "token": token})
+                await websocket.send_json({"event": "ai_done", "full_text": full_reply})
+            elif "text" in data and data["text"]:
+                payload = json.loads(data["text"])
+                prompt = payload.get("prompt", "")
+                await websocket.send_json({"event": "ai_start"})
+                full_reply = ""
+                async for token in ai_engine.generate_response_stream(prompt, payload.get("history")):
+                    full_reply += token
+                    await websocket.send_json({"event": "ai_token", "token": token})
+                await websocket.send_json({"event": "ai_done", "full_text": full_reply})
+    except WebSocketDisconnect:
+        manager.disconnect_audio(websocket)
     except Exception as e:
         logger.error(f"WebSocket voice error: {e}")
         manager.disconnect_audio(websocket)
@@ -239,17 +243,15 @@ async def websocket_audio_endpoint(websocket: WebSocket):
 async def websocket_terminal_endpoint(websocket: WebSocket):
     """Real-time terminal hardware telemetry logs connection."""
     await manager.connect_terminal(websocket)
-    # Initial status banner
     await websocket.send_json({
         "type": "log",
         "level": "SYSTEM",
         "source": "HARDWARE",
-        "message": f"Terminal initialized. Companion hardware status: ONLINE | Model: {settings.OLLAMA_MODEL}"
+        "message": f"Terminal initialized. J.A.R.V.I.S. Core Online | Model: {settings.OLLAMA_MODEL}"
     })
     
     try:
         while True:
-            # Keep-alive heartbeat & listen for incoming commands
             cmd = await websocket.receive_text()
             if cmd == "ping":
                 await websocket.send_json({

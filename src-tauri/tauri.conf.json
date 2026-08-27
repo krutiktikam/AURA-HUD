@@ -13,23 +13,26 @@
     "windows": [
       {
         "title": "AI Companion",
-        "width": 400,
-        "height": 120,
-        "resizable": true,
+        "width": 160,
+        "height": 60,
+        "resizable": false,
         "fullscreen": false,
+        "decorations": false,
+        "transparent": true,
         "alwaysOnTop": true,
         "skipTaskbar": false,
         "center": false,
         "visible": true,
-        "decorations": false,
-        "transparent": false,
+        "shadow": false,
         "maximizable": false,
-        "minimizable": true
+        "minimizable": true,
+        "x": null,
+        "y": 10
       }
     ],
     "trayIcon": {
       "iconPath": "icons/32x32.png",
-      "tooltip": "AI Companion"
+      "tooltip": "AI Companion - Dynamic HUD"
     },
     "security": {
       "csp": null

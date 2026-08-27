@@ -127,6 +127,31 @@ class VoicePipeline:
         logger.info("Using STT fallback for raw audio stream processing.")
         return "System diagnostic check: Please verify device mic input and code status."
 
+    async def transcribe_stream(self, audio_chunk: bytes) -> str:
+        """Stream audio chunks to Faster-Whisper for real-time transcription with VAD."""
+        if not audio_chunk or not self.stt_model or not HAS_FASTER_WHISPER:
+            return ""
+
+        try:
+            loop = asyncio.get_running_loop()
+            def _do_stream_transcribe():
+                audio_stream = io.BytesIO(audio_chunk)
+                segments, info = self.stt_model.transcribe(
+                    audio_stream,
+                    beam_size=5,
+                    language="en",
+                    vad_filter=True,
+                    vad_parameters=dict(min_silence_duration_ms=500)
+                )
+                text_parts = [seg.text for seg in segments]
+                return " ".join(text_parts).strip()
+
+            result = await loop.run_in_executor(None, _do_stream_transcribe)
+            return result if result else ""
+        except Exception as e:
+            logger.error(f"Streaming transcription error: {e}")
+            return ""
+
     def generate_sine_wave_pcm(self, duration_sec: float = 0.5, freq: float = 440.0) -> bytes:
         """Generate PCM audio stream bytes for TTS streaming / waveform visualizer."""
         sample_rate = settings.SAMPLE_RATE

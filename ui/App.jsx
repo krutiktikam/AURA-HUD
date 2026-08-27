@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mic, Zap, RotateCw, VolumeX, Terminal, X } from 'lucide-react';
-import './styles.css';
+import { desktopAPI } from './src/ipcBridge';
+import './src/styles.css';
 
 // Typewriter Effect Component for Neural Stream Output
 function TypewriterText({ text, speed = 20 }) {
@@ -74,57 +75,23 @@ export default function App() {
   const [isThinking, setIsThinking] = useState(false);
   const [isSpeakingTTS, setIsSpeakingTTS] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
+  const [partialText, setPartialText] = useState('');
 
   // Neural Chat Feed
   const [messages, setMessages] = useState([
     {
       id: 1,
       sender: 'companion',
-      text: 'AI COMPANION ONLINE: 100% Offline Local Neural Core Active. Whisper STT & Llama 3.2 ready.'
+      text: 'J.A.R.V.I.S. ONLINE: Local LangChain Core Active. System telemetry tools & Whisper streaming ready.'
     }
   ]);
   const [inputText, setInputText] = useState('');
+  const [selectedVoice, setSelectedVoice] = useState(null);
 
   const chatEndRef = useRef(null);
+  const wsRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
-
-  // Sync IPC state
-  useEffect(() => {
-    if (window.electronAPI?.getWindowState) {
-      window.electronAPI.getWindowState().then((state) => {
-        setIsExpanded(state === 'expanded');
-      });
-    }
-
-    if (window.electronAPI?.onWindowStateChanged) {
-      const unsubscribe = window.electronAPI.onWindowStateChanged((state) => {
-        setIsExpanded(state === 'expanded');
-      });
-      return () => {
-        if (typeof unsubscribe === 'function') unsubscribe();
-      };
-    }
-  }, []);
-
-  // Handshake Logic: Resize window before expanding, delay resize on collapse
-  const handleExpand = async () => {
-    if (window.electronAPI?.resizeWindow) {
-      await window.electronAPI.resizeWindow(1150, 420);
-    }
-    setIsExpanded(true);
-  };
-
-  const handleCollapse = () => {
-    setIsExpanded(false);
-    setTimeout(async () => {
-      if (window.electronAPI?.resizeWindow) {
-        await window.electronAPI.resizeWindow(160, 60);
-      }
-    }, 400);
-  };
-
-  const [selectedVoice, setSelectedVoice] = useState(null);
 
   // Auto-detect and select offline female voice (Microsoft Zira, Jenny, Samantha, etc.)
   useEffect(() => {
@@ -149,25 +116,52 @@ export default function App() {
     }
   }, []);
 
+  // Sync window state via universal Tauri/Electron bridge
+  useEffect(() => {
+    desktopAPI.getWindowState().then((state) => {
+      setIsExpanded(state === 'expanded');
+    });
+
+    const unsubscribe = desktopAPI.onWindowStateChanged((state) => {
+      setIsExpanded(state === 'expanded');
+    });
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
+  }, []);
+
   // Auto-scroll chat
   useEffect(() => {
     if (isExpanded) {
       chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [messages, isThinking, isExpanded]);
+  }, [messages, isThinking, isExpanded, partialText]);
+
+  // Handshake Logic: Resize window before expanding, delay resize on collapse
+  const handleExpand = async () => {
+    await desktopAPI.resizeWindow(1150, 420);
+    setIsExpanded(true);
+  };
+
+  const handleCollapse = () => {
+    setIsExpanded(false);
+    setTimeout(async () => {
+      await desktopAPI.resizeWindow(160, 60);
+    }, 400);
+  };
 
   // Spoken TTS (Uses offline female voice)
   const speakText = (text) => {
     if (isMuted) return;
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
-      const clean = text.replace(/[\*\_#\`]/g, '');
+      const clean = text.replace(/[\*\_#\`\[\]]/g, '');
       const utterance = new SpeechSynthesisUtterance(clean);
       if (selectedVoice) {
         utterance.voice = selectedVoice;
       }
       utterance.rate = 1.02;
-      utterance.pitch = 1.08; // Clear, pleasant female tone
+      utterance.pitch = 1.08;
 
       utterance.onstart = () => setIsSpeakingTTS(true);
       utterance.onend = () => setIsSpeakingTTS(false);
@@ -177,7 +171,7 @@ export default function App() {
     }
   };
 
-  // Handle Send LLM Chat (Local Ollama API)
+  // Handle Send LLM Chat (Local J.A.R.V.I.S. Agent API)
   const handleSend = async (customPrompt) => {
     const prompt = customPrompt || inputText;
     if (!prompt.trim() || isThinking) return;
@@ -185,7 +179,7 @@ export default function App() {
     const userMsg = { id: Date.now(), sender: 'user', text: prompt };
     setMessages((prev) => [...prev, userMsg]);
     if (!customPrompt) setInputText('');
-
+    setPartialText('');
     setIsThinking(true);
 
     try {
@@ -198,8 +192,9 @@ export default function App() {
       if (res.ok) {
         const data = await res.json();
         setIsThinking(false);
-        setMessages((prev) => [...prev, { id: Date.now() + 1, sender: 'companion', text: data.response }]);
-        speakText(data.response);
+        const reply = data.response || 'Telemetry check complete. Systems nominal.';
+        setMessages((prev) => [...prev, { id: Date.now() + 1, sender: 'companion', text: reply }]);
+        speakText(reply);
       } else {
         throw new Error('API Error');
       }
@@ -207,24 +202,66 @@ export default function App() {
       setIsThinking(false);
       setIsTalking(false);
       setIsSpeakingTTS(false);
-      const fallback = '[ALERT] Local backend offline. Ensure Ollama service is active on port 11435.';
+      const fallback = '[ALERT] Local J.A.R.V.I.S. backend offline. Ensure Ollama service is running.';
       setMessages((prev) => [...prev, { id: Date.now() + 2, sender: 'companion', text: fallback }]);
       speakText('Local backend warning.');
     }
   };
 
-  // 100% Offline Voice Recording with Local Faster-Whisper Pipeline
+  // Real-Time Audio Streaming WebSocket Connection
+  const connectLiveSTTWebSocket = () => {
+    try {
+      const ws = new WebSocket('ws://localhost:8000/api/stt/live');
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        console.log('Connected to live STT WebSocket stream');
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.event === 'transcription' && data.text) {
+            setPartialText(data.text);
+            handleSend(data.text);
+          } else if (data.event === 'partial' && data.text) {
+            setPartialText(data.text);
+          }
+        } catch (e) {
+          console.warn('WebSocket message parse error:', e);
+        }
+      };
+
+      ws.onerror = (err) => {
+        console.warn('Live STT WebSocket error, will fallback to HTTP upload:', err);
+      };
+    } catch (e) {
+      console.warn('Could not initialize WebSocket:', e);
+    }
+  };
+
+  // 100% Offline Voice Recording with Live WebSocket Streaming & Faster-Whisper
   const toggleVoice = async () => {
     if (isTalking) {
       if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
         mediaRecorderRef.current.stop();
       }
+      wsRef.current?.close();
       setIsTalking(false);
       return;
     }
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          sampleRate: 16000
+        }
+      });
+
+      connectLiveSTTWebSocket();
+
       audioChunksRef.current = [];
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
@@ -232,6 +269,9 @@ export default function App() {
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
           audioChunksRef.current.push(event.data);
+          if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+            wsRef.current.send(event.data);
+          }
         }
       };
 
@@ -239,32 +279,33 @@ export default function App() {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
         stream.getTracks().forEach((track) => track.stop());
 
-        setIsThinking(true);
-        try {
-          const formData = new FormData();
-          formData.append('file', audioBlob, 'mic.wav');
+        if (!partialText) {
+          setIsThinking(true);
+          try {
+            const formData = new FormData();
+            formData.append('file', audioBlob, 'mic.wav');
 
-          const res = await fetch('http://localhost:8000/api/stt', {
-            method: 'POST',
-            body: formData
-          });
+            const res = await fetch('http://localhost:8000/api/stt', {
+              method: 'POST',
+              body: formData
+            });
 
-          if (res.ok) {
-            const data = await res.json();
-            setIsThinking(false);
-            if (data.transcript && data.transcript.trim() && !data.transcript.includes('[Inaudible')) {
-              handleSend(data.transcript);
+            if (res.ok) {
+              const data = await res.json();
+              setIsThinking(false);
+              if (data.transcript && data.transcript.trim() && !data.transcript.includes('[Inaudible')) {
+                handleSend(data.transcript);
+              }
+            } else {
+              setIsThinking(false);
             }
-          } else {
+          } catch {
             setIsThinking(false);
           }
-        } catch (err) {
-          setIsThinking(false);
-          console.error("Local Whisper STT Error:", err);
         }
       };
 
-      mediaRecorder.start();
+      mediaRecorder.start(500);
       setIsTalking(true);
     } catch (err) {
       console.warn("Direct microphone recording fallback:", err);
@@ -323,16 +364,16 @@ export default function App() {
             <header className="h-[42px] px-5 py-2 flex items-center justify-between border-b border-teal-500/10 bg-[#161b22]/50 flex-shrink-0">
               <div className="flex items-center gap-3">
                 <span className="text-teal-400 font-mono font-bold tracking-wider text-sm flex items-center gap-2">
-                  <span className="text-teal-400">◆</span> AI COMPANION
+                  <span className="text-teal-400">◆</span> J.A.R.V.I.S. COMPANION
                 </span>
                 <span className="bg-teal-500/10 border border-teal-500/30 text-teal-300 text-[10px] px-2 py-0.5 rounded-full font-mono font-semibold">
-                  LLM 1B (OFFLINE)
+                  LANGCHAIN + LLM 1B
                 </span>
               </div>
 
               <div className="flex items-center gap-3">
                 <span className="bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs px-2.5 py-0.5 rounded-md font-mono font-semibold tracking-wide">
-                  {isThinking ? 'COMPUTING' : isTalking ? 'LISTENING (WHISPER)' : isSpeakingTTS ? 'TRANSMITTING' : 'STEADY'}
+                  {isThinking ? 'COMPUTING' : isTalking ? 'STREAMING AUDIO' : isSpeakingTTS ? 'TRANSMITTING' : 'STEADY'}
                 </span>
                 <button
                   onClick={handleCollapse}
@@ -346,7 +387,7 @@ export default function App() {
 
             {/* 3-Column Grid */}
             <main className="grid grid-cols-12 gap-4 p-4 flex-1 min-h-0">
-              {/* Column 1 */}
+              {/* Column 1 (Hardware & Telemetry) */}
               <section className="col-span-3 flex flex-col gap-3">
                 <div className="bg-[#161b22]/80 border border-teal-500/10 rounded-xl p-3.5 flex flex-col gap-2.5">
                   <div className="flex items-center justify-between">
@@ -391,7 +432,7 @@ export default function App() {
                 </div>
               </section>
 
-              {/* Column 2 */}
+              {/* Column 2 (Action Controls) */}
               <section className="col-span-3 grid grid-cols-2 gap-2.5">
                 <button
                   onClick={toggleVoice}
@@ -400,11 +441,11 @@ export default function App() {
                       ? 'border-pink-500 bg-pink-500/10 text-pink-400 shadow-[0_0_12px_rgba(236,72,153,0.3)] animate-pulse'
                       : 'border-teal-500/10 hover:border-teal-500/40 hover:bg-[#1f242d] text-slate-200'
                   }`}
-                  title={isTalking ? 'Click to stop recording & transcribe with Whisper' : 'Click to start voice recording'}
+                  title={isTalking ? 'Click to stop live audio stream' : 'Click to stream live voice to J.A.R.V.I.S.'}
                 >
                   <Mic className={`w-5 h-5 ${isTalking ? 'text-pink-400 scale-110' : 'text-teal-400'}`} />
                   <span className="font-mono font-bold text-[11px] text-center">
-                    {isTalking ? 'STOP (REC)' : 'RECON (VOICE)'}
+                    {isTalking ? 'STREAMING' : 'RECON (VOICE)'}
                   </span>
                 </button>
 
@@ -417,11 +458,11 @@ export default function App() {
                 </button>
 
                 <button
-                  onClick={() => handleSend('Regenerate system response.')}
+                  onClick={() => handleSend('Get system telemetry and diagnostic report.')}
                   className="bg-[#161b22] border border-teal-500/10 hover:border-teal-400/50 hover:bg-[#1f242d] text-slate-200 rounded-xl p-3 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all shadow-md active:scale-95 group"
                 >
                   <RotateCw className="w-5 h-5 text-teal-400 group-hover:rotate-45 transition-transform" />
-                  <span className="font-mono font-bold text-[11px] text-center">REGEN</span>
+                  <span className="font-mono font-bold text-[11px] text-center">TELEMETRY</span>
                 </button>
 
                 <button
@@ -439,7 +480,7 @@ export default function App() {
                 </button>
               </section>
 
-              {/* Column 3 */}
+              {/* Column 3 (Neural Stream Output) */}
               <section className="col-span-6 bg-[#161b22]/70 border border-teal-500/10 rounded-xl p-3.5 flex flex-col justify-between flex-1 min-h-0 relative overflow-hidden bg-hud-grid">
                 <div className="flex items-center justify-between border-b border-teal-500/10 pb-2 flex-shrink-0">
                   <span className="font-mono text-xs font-bold text-teal-400 tracking-wider flex items-center gap-1.5">
@@ -462,20 +503,25 @@ export default function App() {
                         {m.sender === 'user' ? (
                           <span className="text-amber-400">► USER</span>
                         ) : (
-                          <span className="text-teal-400">❖ COMPANION</span>
+                          <span className="text-teal-400">❖ J.A.R.V.I.S.</span>
                         )}
                       </div>
                       {idx === messages.length - 1 && m.sender === 'companion' ? (
                         <TypewriterText text={m.text} speed={20} />
                       ) : (
-                        <span>{m.text}</span>
+                        <span className="whitespace-pre-wrap">{m.text}</span>
                       )}
                     </div>
                   ))}
                   {isThinking && (
                     <div className="p-2.5 rounded-lg border bg-[#0d1117] border-teal-500/30 text-teal-300 self-start">
-                      <div className="text-[10px] font-bold mb-1 text-teal-400">❖ COMPANION</div>
-                      <span className="animate-pulse">⚡ Processing offline neural output...</span>
+                      <div className="text-[10px] font-bold mb-1 text-teal-400">❖ J.A.R.V.I.S.</div>
+                      <span className="animate-pulse">⚡ Invoking local agent & sensor tools...</span>
+                    </div>
+                  )}
+                  {partialText && isTalking && (
+                    <div className="p-2 rounded-lg border border-pink-500/30 bg-pink-500/10 text-pink-300 text-xs">
+                      <span className="font-bold">🎙️ Stream:</span> {partialText}
                     </div>
                   )}
                   <div ref={chatEndRef} />
@@ -492,7 +538,7 @@ export default function App() {
                   <input
                     type="text"
                     className="w-full bg-transparent border-none outline-none text-slate-100 placeholder:text-slate-600 font-mono text-xs"
-                    placeholder="Ask your AI companion..."
+                    placeholder="Ask J.A.R.V.I.S. or request telemetry..."
                     value={inputText}
                     onChange={(e) => setInputText(e.target.value)}
                   />
