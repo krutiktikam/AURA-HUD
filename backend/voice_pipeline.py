@@ -101,7 +101,7 @@ class VoicePipeline:
         return devices
 
     async def transcribe_audio_bytes(self, audio_data: bytes, format: str = "wav") -> str:
-        """Transcribe raw audio bytes into text using faster-whisper 100% offline."""
+        """Transcribe audio bytes (WAV or raw 16kHz PCM) into text using faster-whisper."""
         if not audio_data:
             return ""
 
@@ -109,9 +109,14 @@ class VoicePipeline:
             try:
                 loop = asyncio.get_running_loop()
                 def _do_transcribe():
-                    audio_stream = io.BytesIO(audio_data)
+                    # Handle raw PCM or WAV
+                    if audio_data.startswith(b'RIFF'):
+                        audio_input = io.BytesIO(audio_data)
+                    else:
+                        audio_input = np.frombuffer(audio_data, dtype=np.int16).astype(np.float32) / 32768.0
+
                     segments, info = self.stt_model.transcribe(
-                        audio_stream,
+                        audio_input,
                         beam_size=5,
                         language="en"
                     )
@@ -119,29 +124,33 @@ class VoicePipeline:
                     return text
 
                 result = await loop.run_in_executor(None, _do_transcribe)
-                return result if result else "[Inaudible Audio]"
+                return result if result else ""
             except Exception as e:
                 logger.error(f"Error transcribing audio with Faster-Whisper: {e}")
-                return "[Error processing audio transcription]"
+                return ""
         
         logger.info("Using STT fallback for raw audio stream processing.")
         return "System diagnostic check: Please verify device mic input and code status."
 
     async def transcribe_stream(self, audio_chunk: bytes) -> str:
-        """Stream audio chunks to Faster-Whisper for real-time transcription with VAD."""
+        """Stream raw 16kHz 16-bit Mono PCM audio chunks to Faster-Whisper."""
         if not audio_chunk or not self.stt_model or not HAS_FASTER_WHISPER:
             return ""
 
         try:
             loop = asyncio.get_running_loop()
             def _do_stream_transcribe():
-                audio_stream = io.BytesIO(audio_chunk)
+                if audio_chunk.startswith(b'RIFF'):
+                    audio_input = io.BytesIO(audio_chunk)
+                else:
+                    audio_input = np.frombuffer(audio_chunk, dtype=np.int16).astype(np.float32) / 32768.0
+
                 segments, info = self.stt_model.transcribe(
-                    audio_stream,
+                    audio_input,
                     beam_size=5,
                     language="en",
                     vad_filter=True,
-                    vad_parameters=dict(min_silence_duration_ms=500)
+                    vad_parameters=dict(min_silence_duration_ms=400)
                 )
                 text_parts = [seg.text for seg in segments]
                 return " ".join(text_parts).strip()

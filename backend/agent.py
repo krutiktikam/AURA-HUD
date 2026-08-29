@@ -82,6 +82,40 @@ def execute_safe_command(command: str) -> str:
     except Exception as e:
         return f"Execution failed: {e}"
 
+@tool
+def search_clipboard_history(query: str) -> str:
+    """Search through past clipboard entries stored locally in SQLite WAL.
+
+    Args:
+        query: Keyword or code snippet to search for.
+    """
+    from backend.clipboard_store import search_history
+    results = search_history(query, limit=5)
+    if not results:
+        return f"No recent clipboard entries matching '{query}'."
+    formatted = [f"[{r['category'].upper()} - {r['timestamp']}]:\n{r['content']}" for r in results]
+    return "\n---\n".join(formatted)
+
+@tool
+def process_active_clipboard(action: str) -> str:
+    """Perform quick text transformations on the latest copied clipboard item.
+
+    Args:
+        action: 'uppercase', 'lowercase', 'clean_whitespace', or 'inspect'
+    """
+    from backend.clipboard_store import get_recent_history
+    history = get_recent_history(limit=1)
+    if not history:
+        return "Clipboard history is currently empty."
+    raw = history[0]['content']
+    if action == 'uppercase':
+        return raw.upper()
+    elif action == 'lowercase':
+        return raw.lower()
+    elif action == 'clean_whitespace':
+        return " ".join(raw.split())
+    return f"Active Clipboard [{history[0]['category']}]: {raw}"
+
 # ─── AGENT CLASS ──────────────────────────────────────────────
 
 class JarvisAgent:
@@ -100,7 +134,7 @@ class JarvisAgent:
             num_predict=150
         )
 
-        self.tools = [get_system_telemetry, get_running_processes, execute_safe_command]
+        self.tools = [get_system_telemetry, get_running_processes, execute_safe_command, search_clipboard_history, process_active_clipboard]
         self.chat_history: List[Dict[str, Any]] = []
 
     def set_name(self, new_name: str) -> str:

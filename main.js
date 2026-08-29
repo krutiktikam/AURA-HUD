@@ -1,44 +1,87 @@
-const { app, BrowserWindow, Tray, Menu, globalShortcut, nativeImage, ipcMain, screen } = require('electron');
+const { app, BrowserWindow, Tray, Menu, globalShortcut, nativeImage, ipcMain, screen, clipboard } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
 let win = null;
 let tray = null;
-let currentState = 'compact'; // 'compact' | 'expanded'
+let currentState = 'palette'; // 'palette' | 'expanded' | 'compact'
 
-// Safe area bounding dimensions
+// Dimensions
+const PALETTE_WIDTH = 380;
+const PALETTE_HEIGHT = 320;
 const COMPACT_WIDTH = 160;
 const COMPACT_HEIGHT = 60;
-const EXPANDED_WIDTH = 1150; // Extra padding for shadows
+const EXPANDED_WIDTH = 1150;
 const EXPANDED_HEIGHT = 420;
-const TOP_OFFSET = 10;
 
-function getWindowPosition(width) {
-  const primaryDisplay = screen.getPrimaryDisplay();
-  const { width: screenWidth } = primaryDisplay.workArea;
-  const x = Math.floor((screenWidth - width) / 2);
-  return { x, y: TOP_OFFSET };
+function anchorToCursor(width = PALETTE_WIDTH, height = PALETTE_HEIGHT) {
+  if (!win || win.isDestroyed()) return null;
+
+  const cursor = screen.getCursorScreenPoint();
+  const currentDisplay = screen.getDisplayNearestPoint(cursor);
+  const { x: screenX, y: screenY, width: screenW, height: screenH } = currentDisplay.workArea;
+
+  const rawX = cursor.x - Math.floor(width / 2);
+  const rawY = cursor.y + 12;
+
+  const minX = screenX + 12;
+  const maxX = screenX + screenW - width - 12;
+  const minY = screenY + 12;
+  const maxY = screenY + screenH - height - 12;
+
+  const clampedX = Math.max(minX, Math.min(rawX, maxX));
+  const clampedY = Math.max(minY, Math.min(rawY, maxY));
+
+  win.setBounds({ x: clampedX, y: clampedY, width, height }, true);
+  win.show();
+  win.focus();
+
+  currentState = 'palette';
+  win.webContents.send('window-state-changed', 'palette');
+  win.webContents.send('summon-cursor', { x: clampedX, y: clampedY });
+
+  return { x: clampedX, y: clampedY };
 }
 
 function updateWindowState(newState) {
   if (!win || win.isDestroyed()) return;
-  currentState = newState === 'expanded' ? 'expanded' : 'compact';
-  const width = currentState === 'expanded' ? EXPANDED_WIDTH : COMPACT_WIDTH;
-  const height = currentState === 'expanded' ? EXPANDED_HEIGHT : COMPACT_HEIGHT;
-  const { x, y } = getWindowPosition(width);
+  currentState = newState;
 
-  win.setBounds({ x, y, width, height }, true);
+  let width = PALETTE_WIDTH;
+  let height = PALETTE_HEIGHT;
+
+  if (currentState === 'expanded') {
+    width = EXPANDED_WIDTH;
+    height = EXPANDED_HEIGHT;
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const { width: screenW } = primaryDisplay.workArea;
+    const x = Math.floor((screenW - width) / 2);
+    win.setBounds({ x, y: 20, width, height }, true);
+  } else if (currentState === 'compact') {
+    width = COMPACT_WIDTH;
+    height = COMPACT_HEIGHT;
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const { width: screenW } = primaryDisplay.workArea;
+    const x = Math.floor((screenW - width) / 2);
+    win.setBounds({ x, y: 10, width, height }, true);
+  } else {
+    anchorToCursor(PALETTE_WIDTH, PALETTE_HEIGHT);
+    return;
+  }
+
   win.webContents.send('window-state-changed', currentState);
 }
 
 function createWindow() {
-  const { x, y } = getWindowPosition(COMPACT_WIDTH);
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width: screenW } = primaryDisplay.workArea;
+  const x = Math.floor((screenW - PALETTE_WIDTH) / 2);
 
   win = new BrowserWindow({
-    width: COMPACT_WIDTH,
-    height: COMPACT_HEIGHT,
+    width: PALETTE_WIDTH,
+    height: PALETTE_HEIGHT,
     x: x,
-    y: y,
+    y: 100,
     frame: false,
     transparent: true,
     alwaysOnTop: true,
@@ -61,10 +104,10 @@ function createWindow() {
     win.loadFile(path.join(__dirname, 'ui', 'dist', 'index.html'));
   }
 
-  // Auto-collapse when user clicks outside the window (Blur event)
+  // Auto-collapse / dismiss on blur
   win.on('blur', () => {
-    if (currentState === 'expanded' && win && !win.isDestroyed()) {
-      updateWindowState('compact');
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('window-blur');
     }
   });
 
@@ -92,22 +135,16 @@ function createTray() {
 
   const contextMenu = Menu.buildFromTemplate([
     {
-      label: 'Toggle Island (Compact/Expanded)',
+      label: 'Summon Cursor Palette (Ctrl+Shift+A)',
       click: () => {
-        const nextState = currentState === 'compact' ? 'expanded' : 'compact';
-        updateWindowState(nextState);
+        anchorToCursor(PALETTE_WIDTH, PALETTE_HEIGHT);
       }
     },
     {
-      label: 'Show/Hide Window',
+      label: 'Toggle Full Dashboard (Ctrl+Shift+Y)',
       click: () => {
-        if (!win) return;
-        if (win.isVisible()) {
-          win.hide();
-        } else {
-          win.show();
-          win.focus();
-        }
+        const nextState = currentState === 'expanded' ? 'compact' : 'expanded';
+        updateWindowState(nextState);
       }
     },
     { type: 'separator' },
@@ -120,30 +157,33 @@ function createTray() {
     }
   ]);
 
-  tray.setToolTip('AI Companion - Dynamic HUD');
+  tray.setToolTip('AI Companion - Cursor HUD');
   tray.setContextMenu(contextMenu);
 
   tray.on('click', () => {
-    if (!win) return;
-    if (win.isVisible()) {
-      if (currentState === 'compact') {
-        updateWindowState('expanded');
-      } else {
-        win.hide();
-      }
-    } else {
-      win.show();
-      win.focus();
-    }
+    anchorToCursor(PALETTE_WIDTH, PALETTE_HEIGHT);
   });
 }
 
 function setupIPC() {
-  // OBJECTIVE 1: Dynamic Window Resizing (The "Mail Slot" Fix)
+  ipcMain.handle('anchor-to-cursor', (_event, width, height) => {
+    return anchorToCursor(width, height);
+  });
+
+  ipcMain.handle('get-clipboard-text', () => {
+    const text = clipboard.readText().trim();
+    return {
+      text,
+      has_content: text.length > 0
+    };
+  });
+
   ipcMain.handle('resize-window', (_event, width, height) => {
     if (!win || win.isDestroyed()) return false;
-    const { x, y } = getWindowPosition(width);
-    win.setBounds({ x, y, width, height }, true);
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const { width: screenW } = primaryDisplay.workArea;
+    const x = Math.floor((screenW - width) / 2);
+    win.setBounds({ x, y: 20, width, height }, true);
     return true;
   });
 
@@ -155,33 +195,37 @@ function setupIPC() {
   ipcMain.handle('get-window-state', () => currentState);
 
   ipcMain.handle('toggle-window-state', () => {
-    const nextState = currentState === 'compact' ? 'expanded' : 'compact';
+    const nextState = currentState === 'expanded' ? 'palette' : 'expanded';
     updateWindowState(nextState);
     return currentState;
   });
 
   ipcMain.handle('animation-complete', (_event, targetState) => {
     if (win && !win.isDestroyed() && targetState === 'compact') {
-      const { x, y } = getWindowPosition(COMPACT_WIDTH);
-      win.setBounds({ x, y, width: COMPACT_WIDTH, height: COMPACT_HEIGHT }, true);
+      const primaryDisplay = screen.getPrimaryDisplay();
+      const { width: screenW } = primaryDisplay.workArea;
+      const x = Math.floor((screenW - COMPACT_WIDTH) / 2);
+      win.setBounds({ x, y: 10, width: COMPACT_WIDTH, height: COMPACT_HEIGHT }, true);
     }
     return true;
   });
 }
 
 function registerShortcuts() {
+  // Primary Hotkeys: Ctrl+Shift+A & Ctrl+Shift+Space for Cursor Anchor
+  globalShortcut.register('CommandOrControl+Shift+A', () => {
+    anchorToCursor(PALETTE_WIDTH, PALETTE_HEIGHT);
+  });
+
+  globalShortcut.register('CommandOrControl+Shift+Space', () => {
+    anchorToCursor(PALETTE_WIDTH, PALETTE_HEIGHT);
+  });
+
+  // Secondary Hotkey: Ctrl+Shift+Y for Full Dashboard
   globalShortcut.register('CommandOrControl+Shift+Y', () => {
     if (!win) return;
-    if (!win.isVisible()) {
-      win.show();
-      win.focus();
-      updateWindowState('compact');
-    } else if (currentState === 'compact') {
-      updateWindowState('expanded');
-      win.focus();
-    } else {
-      updateWindowState('compact');
-    }
+    const nextState = currentState === 'expanded' ? 'palette' : 'expanded';
+    updateWindowState(nextState);
   });
 }
 

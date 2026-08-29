@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-08-29 20:26:52",
+  "timestamp": "2026-08-29 20:55:10",
   "health": {
     "ollama": {
       "online": false,
@@ -8,7 +8,7 @@
       "installed_models": []
     },
     "whisper_loaded": true,
-    "agent_tools": 3,
+    "agent_tools": 5,
     "agent_model": "llama3.2:1b",
     "companion_name": "J.A.R.V.I.S."
   },
@@ -26,7 +26,7 @@
     {
       "prompt": "What is 2+2?",
       "response": "I'm operating offline. Systems status normal.",
-      "elapsed_seconds": 2.05,
+      "elapsed_seconds": 2.04,
       "has_expected_keywords": true,
       "contains_movie_script_language": false,
       "response_length": 45,
@@ -35,18 +35,18 @@
     },
     {
       "prompt": "Show me my CPU usage",
-      "response": "CPU: 15.3% | RAM: 63.1% (9.9/15.7 GB) | Disk: 71.8% (341.5/475.7 GB)",
-      "elapsed_seconds": 2.14,
+      "response": "CPU: 16.4% | RAM: 72.1% (11.3/15.7 GB) | Disk: 71.8% (341.5/475.7 GB)",
+      "elapsed_seconds": 2.15,
       "has_expected_keywords": true,
       "contains_movie_script_language": false,
-      "response_length": 68,
+      "response_length": 69,
       "passed": true,
       "test_name": "system_command"
     },
     {
       "prompt": "Write a Python function to reverse a string",
       "response": "I'm operating offline. Systems status normal.",
-      "elapsed_seconds": 2.05,
+      "elapsed_seconds": 2.04,
       "has_expected_keywords": true,
       "contains_movie_script_language": false,
       "response_length": 45,
@@ -86,11 +86,11 @@
     },
     {
       "prompt": "What's my current RAM usage?",
-      "response": "CPU: 41.8% | RAM: 63.5% (9.9/15.7 GB) | Disk: 71.8% (341.5/475.7 GB)",
-      "elapsed_seconds": 2.16,
+      "response": "CPU: 35.3% | RAM: 72.1% (11.3/15.7 GB) | Disk: 71.8% (341.5/475.7 GB)",
+      "elapsed_seconds": 2.13,
       "has_expected_keywords": true,
       "contains_movie_script_language": false,
-      "response_length": 68,
+      "response_length": 69,
       "passed": true,
       "test_name": "tool_usage"
     }
@@ -98,7 +98,7 @@
   "latency_results": [
     {
       "prompt": "Hi",
-      "elapsed": 2.04,
+      "elapsed": 2.05,
       "max_allowed": 10.0,
       "passed": true,
       "test_name": "fast_response"

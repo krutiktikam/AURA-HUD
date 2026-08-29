@@ -124,6 +124,29 @@ async def clear_memory():
     jarvis_agent.clear_memory()
     return {"status": "memory_cleared"}
 
+class ClipboardAddRequest(BaseModel):
+    content: str
+    category: Optional[str] = None
+
+@app.get("/api/clipboard/history")
+async def get_clipboard_history(limit: int = 15):
+    """Get recent clipboard entries from SQLite WAL."""
+    from backend.clipboard_store import get_recent_history
+    return {"history": get_recent_history(limit=limit)}
+
+@app.post("/api/clipboard/add")
+async def add_clipboard(req: ClipboardAddRequest):
+    """Add a snippet to the SQLite WAL clipboard history."""
+    from backend.clipboard_store import add_clipboard_entry
+    result = add_clipboard_entry(req.content, req.category)
+    return result
+
+@app.get("/api/clipboard/search")
+async def search_clipboard(q: str = "", limit: int = 5):
+    """Search clipboard history for a query term."""
+    from backend.clipboard_store import search_history
+    return {"results": search_history(q, limit=limit)}
+
 @app.post("/api/chat")
 async def chat_endpoint(req: ChatRequest):
     """AI chat endpoint using J.A.R.V.I.S. agent with local tools & memory."""
