@@ -159,9 +159,10 @@ class JarvisAgent:
             return reply
         except Exception as e:
             logger.warning(f"ChatOllama direct invocation fallback: {e}")
-            if tool_result:
-                return f"[J.A.R.V.I.S. TELEMETRY]\n{tool_result}"
-            return f"Neural core processing notice: {str(e)}"
+            fallback_reply = f"[J.A.R.V.I.S. TELEMETRY]\n{tool_result}" if tool_result else f"Neural core processing notice: {str(e)}"
+            self.chat_history.append({"role": "user", "content": prompt})
+            self.chat_history.append({"role": "assistant", "content": fallback_reply})
+            return fallback_reply
 
     def clear_memory(self):
         """Clear conversation memory."""
