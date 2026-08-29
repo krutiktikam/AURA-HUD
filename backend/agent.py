@@ -1,9 +1,10 @@
-"""J.A.R.V.I.S. Agent Harness with LangChain and local tools."""
+"""J.A.R.V.I.S. Agent - Practical, concise, customizable AI assistant."""
 import asyncio
 import logging
 import subprocess
 import os
 import psutil
+import time
 from typing import List, Dict, Any, Optional
 
 from langchain_ollama import ChatOllama
@@ -15,124 +16,128 @@ from backend.config import settings
 logger = logging.getLogger("JARVIS")
 logging.basicConfig(level=logging.INFO)
 
-# ------------------- Tools -------------------
+# ─── TOOLS ─────────────────────────────────────────────────────
 
 @tool
 def get_system_telemetry() -> str:
-    """Get current system telemetry including CPU usage, RAM usage, and disk space.
+    """Get CPU, RAM, and disk usage statistics for this computer.
 
-    Returns a formatted string with system metrics.
+    Use this when the user asks about system performance, resource usage,
+    or hardware status. Returns current values in percent and GB.
     """
     try:
-        cpu_percent = psutil.cpu_percent(interval=0.1)
-        memory = psutil.virtual_memory()
+        cpu = psutil.cpu_percent(interval=0.1)
+        mem = psutil.virtual_memory()
         disk = psutil.disk_usage(os.path.abspath(os.sep))
-
         return (
-            f"System Telemetry:\n"
-            f"- CPU Usage: {cpu_percent:.1f}%\n"
-            f"- RAM Usage: {memory.percent:.1f}% ({memory.used / 1024**3:.2f}GB / {memory.total / 1024**3:.2f}GB)\n"
-            f"- Disk Usage: {disk.percent:.1f}% ({disk.used / 1024**3:.2f}GB / {disk.total / 1024**3:.2f}GB)"
+            f"CPU: {cpu}% | "
+            f"RAM: {mem.percent}% ({mem.used/1024**3:.1f}/{mem.total/1024**3:.1f} GB) | "
+            f"Disk: {disk.percent}% ({disk.used/1024**3:.1f}/{disk.total/1024**3:.1f} GB)"
         )
     except Exception as e:
-        return f"Error getting telemetry: {str(e)}"
+        return f"Could not read telemetry: {e}"
 
 @tool
-def execute_terminal_command(command: str) -> str:
-    """Execute a safe terminal command and return its output.
+def get_running_processes(limit: int = 5) -> str:
+    """Get the top processes by memory usage.
 
     Args:
-        command: The command to execute (e.g., 'dir', 'echo hello', 'hostname')
-
-    Returns:
-        The command output as a string.
+        limit: How many processes to return (default 5)
     """
-    dangerous = ['rmdir /s', 'del /f /s /q', 'format', 'diskpart', 'rm -rf', 'sudo', 'chmod 777', 'mkfs', 'dd if=']
-    if any(d in command.lower() for d in dangerous):
-        return "Error: Command rejected by J.A.R.V.I.S. security protocol."
+    try:
+        procs = []
+        for p in psutil.process_iter(['name', 'memory_percent', 'cpu_percent']):
+            try:
+                procs.append(p.info)
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
+        procs.sort(key=lambda x: x.get('memory_percent') or 0, reverse=True)
+
+        lines = [f"  {p['name']}: {p['memory_percent']:.1f}% RAM"
+                 for p in procs[:limit] if p.get('name')]
+        return "Top processes:\n" + "\n".join(lines)
+    except Exception as e:
+        return f"Could not list processes: {e}"
+
+@tool
+def execute_safe_command(command: str) -> str:
+    """Run a safe read-only terminal command. Blocks dangerous operations.
+
+    Args:
+        command: A shell command like 'dir', 'echo hello', 'hostname'
+    """
+    blocked = ['rmdir /s', 'del /f /s /q', 'format', 'diskpart', 'rm -rf', 'sudo', 'chmod 777', 'mkfs', 'dd', ':(){:|:&};:']
+    if any(b in command.lower() for b in blocked):
+        return "Command blocked for safety."
 
     try:
         result = subprocess.run(
-            command,
-            shell=True,
-            capture_output=True,
-            text=True,
-            timeout=10,
-            cwd=os.getcwd()
+            command, shell=True, capture_output=True,
+            text=True, timeout=5, cwd=os.getcwd()
         )
         output = result.stdout if result.returncode == 0 else (result.stderr or result.stdout)
-        return output.strip() if output else "Command executed successfully (no output)."
+        return output[:500].strip() if output else "Command completed."
     except subprocess.TimeoutExpired:
-        return "Error: Command execution timed out (10s limit)."
+        return "Command timed out after 5 seconds."
     except Exception as e:
-        return f"Error executing command: {str(e)}"
+        return f"Execution failed: {e}"
 
-@tool
-def get_running_processes() -> str:
-    """Get a list of top currently running processes with their CPU and memory usage.
-
-    Returns top 10 processes by memory usage.
-    """
-    try:
-        processes = []
-        for proc in psutil.process_iter(['pid', 'name', 'memory_percent', 'cpu_percent']):
-            try:
-                processes.append(proc.info)
-            except (psutil.NoSuchProcess, psutil.AccessDenied):
-                pass
-
-        processes.sort(key=lambda x: x.get('memory_percent') or 0, reverse=True)
-        top = processes[:10]
-
-        result = "Top 10 Processes by Memory Usage:\n"
-        for p in top:
-            mem = p.get('memory_percent') or 0.0
-            cpu = p.get('cpu_percent') or 0.0
-            result += f"  PID {p.get('pid')}: {p.get('name')} - {mem:.1f}% RAM, {cpu:.1f}% CPU\n"
-
-        return result
-    except Exception as e:
-        return f"Error getting processes: {str(e)}"
-
-# ------------------- Agent Setup -------------------
+# ─── AGENT CLASS ──────────────────────────────────────────────
 
 class JarvisAgent:
-    """J.A.R.V.I.S. - Just A Rather Very Intelligent System."""
+    """Practical AI Companion Agent with dynamic naming, memory inspection & tool execution."""
 
-    def __init__(self, model: str = settings.OLLAMA_MODEL, base_url: str = settings.OLLAMA_BASE_URL):
+    def __init__(self, model: str = settings.OLLAMA_MODEL, base_url: str = settings.OLLAMA_BASE_URL, name: str = settings.COMPANION_NAME):
         self.model = model
         self.base_url = base_url
-        self.tools = [get_system_telemetry, execute_terminal_command, get_running_processes]
-        self.tools_by_name = {t.name: t for t in self.tools}
+        self.name = name
 
+        # Low temperature for predictable, accurate, non-hallucinatory output
         self.llm = ChatOllama(
             model=self.model,
             base_url=self.base_url,
-            temperature=0.4
+            temperature=0.3,
+            num_predict=150
         )
-        self.chat_history: List[Dict[str, str]] = []
+
+        self.tools = [get_system_telemetry, get_running_processes, execute_safe_command]
+        self.chat_history: List[Dict[str, Any]] = []
+
+    def set_name(self, new_name: str) -> str:
+        """Update the companion's display name."""
+        clean_name = new_name.strip()
+        if clean_name:
+            self.name = clean_name
+            settings.COMPANION_NAME = clean_name
+        return self.name
+
+    def get_memory(self) -> List[Dict[str, Any]]:
+        """Return the current active conversation memory."""
+        return list(self.chat_history)
+
+    def clear_memory(self):
+        """Clear conversation memory."""
+        self.chat_history.clear()
+
+    def _get_system_prompt(self) -> str:
+        return settings.SYSTEM_PROMPT.format(companion_name=self.name)
 
     async def ainvoke(self, prompt: str, history: Optional[List[Dict[str, str]]] = None) -> str:
-        """Async invoke the agent with conversation memory and dynamic tool execution."""
-        # Simple keywords/intent detection for fast tool invocation with small 1B/1.5B models
+        """Get a concise response from the assistant."""
         lower_prompt = prompt.lower()
         tool_result = ""
 
-        if any(w in lower_prompt for w in ["telemetry", "cpu", "ram", "memory usage", "system status", "hardware"]):
+        # Intent detection for fast, deterministic tool execution
+        if any(w in lower_prompt for w in ["cpu", "ram", "telemetry", "hardware", "memory usage", "disk space", "system status"]):
             tool_result = get_system_telemetry.invoke({})
         elif any(w in lower_prompt for w in ["processes", "running tasks", "tasklist", "top process"]):
-            tool_result = get_running_processes.invoke({})
+            tool_result = get_running_processes.invoke({"limit": 5})
 
-        # Assemble prompt with memory
         messages = [
-            SystemMessage(content=(
-                "You are J.A.R.V.I.S., an advanced AI companion embedded in a tactical desktop HUD. "
-                "Provide concise, crisp, highly intelligent responses. "
-                "When system metrics or command outputs are available, incorporate them accurately."
-            ))
+            SystemMessage(content=self._get_system_prompt())
         ]
 
-        # Add history
+        # Add conversation history window (last 6 messages)
         active_history = history if history is not None else self.chat_history
         for msg in active_history[-6:]:
             role = msg.get("role") or msg.get("sender")
@@ -144,29 +149,45 @@ class JarvisAgent:
 
         user_content = prompt
         if tool_result:
-            user_content += f"\n\n[SYSTEM SENSOR DATA:\n{tool_result}\n]"
+            user_content += f"\n\n[SYSTEM TOOL DATA: {tool_result}]"
 
         messages.append(HumanMessage(content=user_content))
 
         try:
             response = await self.llm.ainvoke(messages)
-            reply = response.content if hasattr(response, 'content') else str(response)
+            raw_reply = response.content if hasattr(response, 'content') else str(response)
+            cleaned_reply = self._clean_response(raw_reply)
 
-            # Update memory
-            self.chat_history.append({"role": "user", "content": prompt})
-            self.chat_history.append({"role": "assistant", "content": reply})
+            # Record in working memory
+            self.chat_history.append({"role": "user", "content": prompt, "timestamp": time.time()})
+            self.chat_history.append({"role": "assistant", "content": cleaned_reply, "timestamp": time.time()})
 
-            return reply
+            return cleaned_reply
         except Exception as e:
             logger.warning(f"ChatOllama direct invocation fallback: {e}")
-            fallback_reply = f"[J.A.R.V.I.S. TELEMETRY]\n{tool_result}" if tool_result else f"Neural core processing notice: {str(e)}"
-            self.chat_history.append({"role": "user", "content": prompt})
-            self.chat_history.append({"role": "assistant", "content": fallback_reply})
-            return fallback_reply
+            fallback = tool_result if tool_result else f"I'm operating offline. Systems status normal."
+            cleaned = self._clean_response(fallback)
+            self.chat_history.append({"role": "user", "content": prompt, "timestamp": time.time()})
+            self.chat_history.append({"role": "assistant", "content": cleaned, "timestamp": time.time()})
+            return cleaned
 
-    def clear_memory(self):
-        """Clear conversation memory."""
-        self.chat_history.clear()
+    def _clean_response(self, text: str) -> str:
+        """Remove theatrical/movie-script language and military jargon."""
+        replacements = {
+            "tactical operator": "you",
+            "tactical": "",
+            "situational awareness": "context",
+            "high-performance display unit": "app",
+            "strategic support": "help",
+            "computing, sir": "thinking",
+            "at your service": "ready to help",
+            "classified": "unavailable",
+            "HUD": "screen",
+        }
+        for old, new in replacements.items():
+            text = text.replace(old, new)
+            text = text.replace(old.capitalize(), new.capitalize())
+        return " ".join(text.split()).strip()
 
-# Singleton instance
+# Singleton
 jarvis_agent = JarvisAgent()

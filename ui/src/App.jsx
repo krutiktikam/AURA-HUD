@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mic, Zap, RotateCw, VolumeX, Terminal, X } from 'lucide-react';
+import { Mic, Zap, RotateCw, VolumeX, Terminal, X, Brain, Edit3, Trash2, Check } from 'lucide-react';
 import { desktopAPI } from './ipcBridge';
 import './styles.css';
 
@@ -69,6 +69,11 @@ function AnimatedEQMeter({ isTalking, isThinking, isSpeaking }) {
 
 export default function App() {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [companionName, setCompanionName] = useState('J.A.R.V.I.S.');
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState('J.A.R.V.I.S.');
+  const [isMemoryOpen, setIsMemoryOpen] = useState(false);
+  const [memoryList, setMemoryList] = useState([]);
 
   // Activity States
   const [isTalking, setIsTalking] = useState(false);
@@ -82,7 +87,7 @@ export default function App() {
     {
       id: 1,
       sender: 'companion',
-      text: 'J.A.R.V.I.S. ONLINE: Local LangChain Core Active. System telemetry tools & Whisper streaming ready.'
+      text: 'J.A.R.V.I.S. ONLINE: Practical assistant core active. System telemetry & live streaming ready.'
     }
   ]);
   const [inputText, setInputText] = useState('');
@@ -93,7 +98,20 @@ export default function App() {
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
 
-  // Auto-detect and select offline female voice (Microsoft Zira, Jenny, Samantha, etc.)
+  // Fetch companion metadata
+  useEffect(() => {
+    fetch('http://localhost:8000/api/companion')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.name) {
+          setCompanionName(data.name);
+          setNameInput(data.name);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Auto-detect and select offline female voice
   useEffect(() => {
     const updateVoice = () => {
       if ('speechSynthesis' in window) {
@@ -116,7 +134,7 @@ export default function App() {
     }
   }, []);
 
-  // Sync window state via universal Tauri/Electron bridge
+  // Sync window state via universal desktop bridge
   useEffect(() => {
     desktopAPI.getWindowState().then((state) => {
       setIsExpanded(state === 'expanded');
@@ -132,12 +150,12 @@ export default function App() {
 
   // Auto-scroll chat
   useEffect(() => {
-    if (isExpanded) {
+    if (isExpanded && !isMemoryOpen) {
       chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [messages, isThinking, isExpanded, partialText]);
+  }, [messages, isThinking, isExpanded, partialText, isMemoryOpen]);
 
-  // Handshake Logic: Resize window before expanding, delay resize on collapse
+  // Handshake Logic
   const handleExpand = async () => {
     await desktopAPI.resizeWindow(1150, 420);
     setIsExpanded(true);
@@ -145,12 +163,56 @@ export default function App() {
 
   const handleCollapse = () => {
     setIsExpanded(false);
+    setIsMemoryOpen(false);
     setTimeout(async () => {
       await desktopAPI.resizeWindow(160, 60);
     }, 400);
   };
 
-  // Spoken TTS (Uses offline female voice)
+  // Fetch memory
+  const loadMemory = async () => {
+    try {
+      const res = await fetch('http://localhost:8000/api/memory');
+      if (res.ok) {
+        const data = await res.json();
+        setMemoryList(data.history || []);
+      }
+    } catch {
+      setMemoryList([]);
+    }
+  };
+
+  // Clear memory
+  const handleClearMemory = async () => {
+    try {
+      await fetch('http://localhost:8000/api/memory/clear', { method: 'POST' });
+      setMemoryList([]);
+    } catch (e) {
+      console.warn('Could not clear memory:', e);
+    }
+  };
+
+  // Save new companion name
+  const handleSaveName = async () => {
+    if (!nameInput.trim()) return;
+    try {
+      const res = await fetch('http://localhost:8000/api/companion/rename', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: nameInput.trim() })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCompanionName(data.name);
+        setIsEditingName(false);
+      }
+    } catch {
+      setCompanionName(nameInput.trim());
+      setIsEditingName(false);
+    }
+  };
+
+  // Spoken TTS
   const speakText = (text) => {
     if (isMuted) return;
     if ('speechSynthesis' in window) {
@@ -171,7 +233,7 @@ export default function App() {
     }
   };
 
-  // Handle Send LLM Chat (Local J.A.R.V.I.S. Agent API)
+  // Handle Send LLM Chat
   const handleSend = async (customPrompt) => {
     const prompt = customPrompt || inputText;
     if (!prompt.trim() || isThinking) return;
@@ -202,7 +264,7 @@ export default function App() {
       setIsThinking(false);
       setIsTalking(false);
       setIsSpeakingTTS(false);
-      const fallback = '[ALERT] Local J.A.R.V.I.S. backend offline. Ensure Ollama service is running.';
+      const fallback = `[ALERT] ${companionName} local backend offline. Systems status normal.`;
       setMessages((prev) => [...prev, { id: Date.now() + 2, sender: 'companion', text: fallback }]);
       speakText('Local backend warning.');
     }
@@ -240,7 +302,7 @@ export default function App() {
     }
   };
 
-  // 100% Offline Voice Recording with Live WebSocket Streaming & Faster-Whisper
+  // 100% Offline Voice Recording with Live WebSocket Streaming
   const toggleVoice = async () => {
     if (isTalking) {
       if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
@@ -279,7 +341,6 @@ export default function App() {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
         stream.getTracks().forEach((track) => track.stop());
 
-        // HTTP fallback if websocket didn't produce transcript
         if (!partialText) {
           setIsThinking(true);
           try {
@@ -306,7 +367,7 @@ export default function App() {
         }
       };
 
-      mediaRecorder.start(500); // 500ms chunks for live streaming
+      mediaRecorder.start(500);
       setIsTalking(true);
     } catch (err) {
       console.warn("Direct microphone recording fallback:", err);
@@ -328,9 +389,8 @@ export default function App() {
             exit={{ opacity: 0, scale: 0.8 }}
             transition={{ type: 'spring', stiffness: 350, damping: 25 }}
             className="w-[140px] h-[40px] rounded-full bg-[#0d1117]/90 backdrop-blur-md border border-teal-500/30 shadow-lg shadow-teal-500/10 cursor-pointer flex items-center justify-center gap-2.5 px-3 hover:border-teal-400/60 hover:shadow-teal-500/20 transition-all select-none group"
-            title="Click to expand AI Companion"
+            title={`Click to expand ${companionName}`}
           >
-            {/* Tactical Telemetry Circular Gauge */}
             <div className="relative w-4 h-4 flex items-center justify-center">
               <motion.div
                 animate={{ opacity: [0.4, 1, 0.4], scale: [0.9, 1.15, 0.9] }}
@@ -346,8 +406,8 @@ export default function App() {
               </svg>
             </div>
 
-            <span className="font-sans font-semibold text-xs text-slate-200 tracking-wide group-hover:text-teal-300 transition-colors">
-              {isTalking ? 'Listening...' : isThinking ? 'Thinking...' : isSpeakingTTS ? 'Speaking...' : 'AI Ready'}
+            <span className="font-sans font-semibold text-xs text-slate-200 tracking-wide group-hover:text-teal-300 transition-colors truncate max-w-[80px]">
+              {isTalking ? 'Listening' : isThinking ? 'Thinking' : isSpeakingTTS ? 'Speaking' : companionName}
             </span>
           </motion.div>
         ) : (
@@ -359,20 +419,61 @@ export default function App() {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9 }}
             transition={{ type: 'spring', stiffness: 350, damping: 25 }}
-            className="w-[1113px] h-[385px] bg-[#0d1117]/95 backdrop-blur-xl border border-teal-500/20 rounded-2xl shadow-2xl overflow-hidden text-slate-100 font-sans flex flex-col justify-between select-none"
+            className="w-[1113px] h-[385px] bg-[#0d1117]/95 backdrop-blur-xl border border-teal-500/20 rounded-2xl shadow-2xl overflow-hidden text-slate-100 font-sans flex flex-col justify-between select-none relative"
           >
             {/* Header */}
             <header className="h-[42px] px-5 py-2 flex items-center justify-between border-b border-teal-500/10 bg-[#161b22]/50 flex-shrink-0">
               <div className="flex items-center gap-3">
-                <span className="text-teal-400 font-mono font-bold tracking-wider text-sm flex items-center gap-2">
-                  <span className="text-teal-400">◆</span> J.A.R.V.I.S. COMPANION
-                </span>
+                {isEditingName ? (
+                  <div className="flex items-center gap-1.5 bg-[#0d1117] border border-teal-400 px-2 py-0.5 rounded">
+                    <input
+                      type="text"
+                      className="bg-transparent text-teal-300 font-mono font-bold text-xs outline-none w-24"
+                      value={nameInput}
+                      onChange={(e) => setNameInput(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSaveName()}
+                      autoFocus
+                    />
+                    <button onClick={handleSaveName} className="text-emerald-400 hover:text-emerald-300">
+                      <Check className="w-3.5 h-3.5" />
+                    </button>
+                    <button onClick={() => setIsEditingName(false)} className="text-rose-400 hover:text-rose-300">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 group cursor-pointer" onClick={() => setIsEditingName(true)} title="Click to rename companion">
+                    <span className="text-teal-400 font-mono font-bold tracking-wider text-sm flex items-center gap-2">
+                      <span className="text-teal-400">◆</span> {companionName.toUpperCase()}
+                    </span>
+                    <Edit3 className="w-3 h-3 text-slate-500 group-hover:text-teal-400 transition-colors" />
+                  </div>
+                )}
+
                 <span className="bg-teal-500/10 border border-teal-500/30 text-teal-300 text-[10px] px-2 py-0.5 rounded-full font-mono font-semibold">
-                  LANGCHAIN + LLM 1B
+                  LOCAL CORE
                 </span>
               </div>
 
               <div className="flex items-center gap-3">
+                {/* Working Memory Inspector Button */}
+                <button
+                  onClick={() => {
+                    const next = !isMemoryOpen;
+                    setIsMemoryOpen(next);
+                    if (next) loadMemory();
+                  }}
+                  className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-md font-mono text-xs border transition-all cursor-pointer ${
+                    isMemoryOpen
+                      ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300 shadow-[0_0_8px_rgba(56,189,248,0.3)]'
+                      : 'bg-[#161b22] border-teal-500/20 text-slate-400 hover:text-teal-300 hover:border-teal-500/40'
+                  }`}
+                  title="View / Inspect Working Memory"
+                >
+                  <Brain className="w-3.5 h-3.5" />
+                  <span>MEMORY</span>
+                </button>
+
                 <span className="bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs px-2.5 py-0.5 rounded-md font-mono font-semibold tracking-wide">
                   {isThinking ? 'COMPUTING' : isTalking ? 'STREAMING AUDIO' : isSpeakingTTS ? 'TRANSMITTING' : 'STEADY'}
                 </span>
@@ -386,8 +487,68 @@ export default function App() {
               </div>
             </header>
 
-            {/* 3-Column Grid */}
-            <main className="grid grid-cols-12 gap-4 p-4 flex-1 min-h-0">
+            {/* MAIN AREA */}
+            <main className="grid grid-cols-12 gap-4 p-4 flex-1 min-h-0 relative">
+              {/* Working Memory Inspector Overlay */}
+              <AnimatePresence>
+                {isMemoryOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="absolute inset-x-4 top-4 bottom-4 bg-[#0d1117]/98 border border-cyan-500/30 rounded-xl p-4 z-20 flex flex-col justify-between shadow-2xl backdrop-blur-2xl font-mono"
+                  >
+                    <div className="flex items-center justify-between border-b border-teal-500/20 pb-2 flex-shrink-0">
+                      <div className="flex items-center gap-2 text-cyan-400 font-bold text-sm">
+                        <Brain className="w-4 h-4" /> {companionName}'S ACTIVE WORKING MEMORY
+                        <span className="text-xs text-slate-400 font-normal">({memoryList.length} turns)</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={handleClearMemory}
+                          className="flex items-center gap-1 text-xs text-rose-400 hover:text-rose-300 border border-rose-500/30 px-2 py-0.5 rounded cursor-pointer transition-colors"
+                        >
+                          <Trash2 className="w-3 h-3" /> Clear Memory
+                        </button>
+                        <button
+                          onClick={() => setIsMemoryOpen(false)}
+                          className="text-slate-400 hover:text-slate-200 cursor-pointer"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto my-2 pr-2 flex flex-col gap-2 text-xs">
+                      {memoryList.length === 0 ? (
+                        <div className="text-slate-500 text-center py-8">Working memory buffer is currently empty.</div>
+                      ) : (
+                        memoryList.map((item, idx) => (
+                          <div
+                            key={idx}
+                            className={`p-2 rounded border ${
+                              item.role === 'user'
+                                ? 'bg-[#161b22] border-amber-500/30 text-amber-200'
+                                : 'bg-[#131923] border-cyan-500/30 text-slate-200'
+                            }`}
+                          >
+                            <div className="font-bold text-[10px] text-slate-400 mb-0.5">
+                              {item.role === 'user' ? '► USER' : `❖ ${companionName.toUpperCase()}`}
+                            </div>
+                            <div className="whitespace-pre-wrap">{item.content}</div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    <div className="text-[10px] text-slate-500 border-t border-teal-500/10 pt-2 flex items-center justify-between">
+                      <span>Memory Window: Active last 6 exchanges</span>
+                      <span>Persistence: Local Session Buffer</span>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               {/* Column 1 (Hardware & Telemetry) */}
               <section className="col-span-3 flex flex-col gap-3">
                 <div className="bg-[#161b22]/80 border border-teal-500/10 rounded-xl p-3.5 flex flex-col gap-2.5">
@@ -442,7 +603,7 @@ export default function App() {
                       ? 'border-pink-500 bg-pink-500/10 text-pink-400 shadow-[0_0_12px_rgba(236,72,153,0.3)] animate-pulse'
                       : 'border-teal-500/10 hover:border-teal-500/40 hover:bg-[#1f242d] text-slate-200'
                   }`}
-                  title={isTalking ? 'Click to stop live audio stream' : 'Click to stream live voice to J.A.R.V.I.S.'}
+                  title={isTalking ? 'Click to stop live audio stream' : `Click to stream live voice to ${companionName}`}
                 >
                   <Mic className={`w-5 h-5 ${isTalking ? 'text-pink-400 scale-110' : 'text-teal-400'}`} />
                   <span className="font-mono font-bold text-[11px] text-center">
@@ -459,7 +620,7 @@ export default function App() {
                 </button>
 
                 <button
-                  onClick={() => handleSend('Get system telemetry and diagnostic report.')}
+                  onClick={() => handleSend('Get system telemetry and status.')}
                   className="bg-[#161b22] border border-teal-500/10 hover:border-teal-400/50 hover:bg-[#1f242d] text-slate-200 rounded-xl p-3 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all shadow-md active:scale-95 group"
                 >
                   <RotateCw className="w-5 h-5 text-teal-400 group-hover:rotate-45 transition-transform" />
@@ -504,7 +665,7 @@ export default function App() {
                         {m.sender === 'user' ? (
                           <span className="text-amber-400">► USER</span>
                         ) : (
-                          <span className="text-teal-400">❖ J.A.R.V.I.S.</span>
+                          <span className="text-teal-400">❖ {companionName.toUpperCase()}</span>
                         )}
                       </div>
                       {idx === messages.length - 1 && m.sender === 'companion' ? (
@@ -516,7 +677,7 @@ export default function App() {
                   ))}
                   {isThinking && (
                     <div className="p-2.5 rounded-lg border bg-[#0d1117] border-teal-500/30 text-teal-300 self-start">
-                      <div className="text-[10px] font-bold mb-1 text-teal-400">❖ J.A.R.V.I.S.</div>
+                      <div className="text-[10px] font-bold mb-1 text-teal-400">❖ {companionName.toUpperCase()}</div>
                       <span className="animate-pulse">⚡ Invoking local agent & sensor tools...</span>
                     </div>
                   )}
@@ -539,7 +700,7 @@ export default function App() {
                   <input
                     type="text"
                     className="w-full bg-transparent border-none outline-none text-slate-100 placeholder:text-slate-600 font-mono text-xs"
-                    placeholder="Ask J.A.R.V.I.S. or request telemetry..."
+                    placeholder={`Ask ${companionName} or request telemetry...`}
                     value={inputText}
                     onChange={(e) => setInputText(e.target.value)}
                   />

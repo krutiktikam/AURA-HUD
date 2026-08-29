@@ -91,6 +91,39 @@ async def get_config():
         "audio_devices": voice_pipeline.get_audio_devices()
     }
 
+class RenameRequest(BaseModel):
+    name: str
+
+@app.get("/api/companion")
+async def get_companion():
+    """Get active companion metadata."""
+    return {
+        "name": jarvis_agent.name,
+        "model": jarvis_agent.model,
+        "memory_turns": len(jarvis_agent.chat_history) // 2
+    }
+
+@app.post("/api/companion/rename")
+async def rename_companion(req: RenameRequest):
+    """Rename the AI companion."""
+    new_name = jarvis_agent.set_name(req.name)
+    return {"status": "success", "name": new_name}
+
+@app.get("/api/memory")
+async def get_memory():
+    """Inspect active conversation memory."""
+    return {
+        "companion_name": jarvis_agent.name,
+        "count": len(jarvis_agent.chat_history),
+        "history": jarvis_agent.get_memory()
+    }
+
+@app.post("/api/memory/clear")
+async def clear_memory():
+    """Clear active conversation memory."""
+    jarvis_agent.clear_memory()
+    return {"status": "memory_cleared"}
+
 @app.post("/api/chat")
 async def chat_endpoint(req: ChatRequest):
     """AI chat endpoint using J.A.R.V.I.S. agent with local tools & memory."""
