@@ -18,7 +18,10 @@ import {
   Minimize2,
   FileText,
   FileCode,
-  CheckCheck
+  CheckCheck,
+  Compass,
+  Layers,
+  ArrowRight
 } from 'lucide-react';
 import { desktopAPI } from './src/ipcBridge';
 import './src/styles.css';
@@ -98,12 +101,14 @@ function categorizeClipboard(text) {
 }
 
 export default function App() {
-  const [viewMode, setViewMode] = useState('palette');
-  const [companionName, setCompanionName] = useState('J.A.R.V.I.S.');
+  // viewMode: 'wheel' (GTA halo ring) | 'card' (Liquid stream card) | 'dashboard' (Full 1113px HUD)
+  const [viewMode, setViewMode] = useState('wheel');
+  const [companionName, setCompanionName] = useState('AURA');
   const [isEditingName, setIsEditingName] = useState(false);
-  const [nameInput, setNameInput] = useState('J.A.R.V.I.S.');
+  const [nameInput, setNameInput] = useState('AURA');
   const [isMemoryOpen, setIsMemoryOpen] = useState(false);
   const [memoryList, setMemoryList] = useState([]);
+  const [hoveredSector, setHoveredSector] = useState(null);
 
   // Clipboard State
   const [clipboardText, setClipboardText] = useState('');
@@ -122,11 +127,11 @@ export default function App() {
     {
       id: 1,
       sender: 'companion',
-      text: 'AURA CURSOR HUD ACTIVE: Context-aware palette ready. Global hotkey: Ctrl+Shift+A'
+      text: 'AURA ACTIVE: GTA Halo Ring + Morphing Liquid Card online. Global hotkey: Ctrl+Shift+A'
     }
   ]);
   const [inputText, setInputText] = useState('');
-  const [paletteResponse, setPaletteResponse] = useState('');
+  const [streamResponse, setStreamResponse] = useState('');
   const [selectedVoice, setSelectedVoice] = useState(null);
 
   const chatEndRef = useRef(null);
@@ -163,20 +168,22 @@ export default function App() {
       .catch(() => {});
 
     const unSummon = desktopAPI.onSummonCursor(() => {
-      setViewMode('palette');
-      setPaletteResponse('');
+      setViewMode('wheel');
+      setStreamResponse('');
       refreshClipboard();
     });
 
     const unState = desktopAPI.onWindowStateChanged((state) => {
-      if (state === 'expanded' || state === 'palette') {
-        setViewMode(state);
+      if (state === 'expanded') {
+        setViewMode('dashboard');
+      } else {
+        setViewMode('wheel');
       }
     });
 
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
-        setViewMode('palette');
+        setViewMode('wheel');
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -208,20 +215,24 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (viewMode === 'expanded' && !isMemoryOpen) {
+    if (viewMode === 'dashboard' && !isMemoryOpen) {
       chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages, isThinking, viewMode, partialText, isMemoryOpen]);
 
   const handleExpandToDashboard = async () => {
     await desktopAPI.resizeWindow(1150, 420);
-    setViewMode('expanded');
+    setViewMode('dashboard');
   };
 
-  const handleCollapseToPalette = async () => {
-    await desktopAPI.anchorToCursor(380, 320);
-    setViewMode('palette');
+  const handleCollapseToWheel = async () => {
+    await desktopAPI.anchorToCursor(420, 420);
+    setViewMode('wheel');
     setIsMemoryOpen(false);
+  };
+
+  const handleSwitchToCard = () => {
+    setViewMode('card');
   };
 
   const speakText = (text) => {
@@ -252,6 +263,10 @@ export default function App() {
     setPartialText('');
     setIsThinking(true);
 
+    if (viewMode === 'wheel') {
+      setViewMode('card');
+    }
+
     try {
       const res = await fetch('http://localhost:8000/api/chat', {
         method: 'POST',
@@ -262,9 +277,9 @@ export default function App() {
       if (res.ok) {
         const data = await res.json();
         setIsThinking(false);
-        const reply = data.response || 'Action complete. Systems normal.';
+        const reply = data.response || 'Operation complete.';
         setMessages((prev) => [...prev, { id: Date.now() + 1, sender: 'companion', text: reply }]);
-        setPaletteResponse(reply);
+        setStreamResponse(reply);
         speakText(reply);
       } else {
         throw new Error('API Error');
@@ -273,29 +288,32 @@ export default function App() {
       setIsThinking(false);
       setIsTalking(false);
       setIsSpeakingTTS(false);
-      const fallback = `[Notice] ${companionName} local server active.`;
+      const fallback = `[Notice] ${companionName} operating in local standby mode.`;
       setMessages((prev) => [...prev, { id: Date.now() + 2, sender: 'companion', text: fallback }]);
-      setPaletteResponse(fallback);
-      speakText('Operating in offline mode.');
+      setStreamResponse(fallback);
+      speakText('Local server active.');
     }
   };
 
   const handleQuickAction = (actionType) => {
-    if (!clipboardText.trim()) return;
+    if (!clipboardText.trim()) {
+      handleSend('Provide an overview of active capabilities.');
+      return;
+    }
 
     let prompt = '';
-    if (actionType === 'explain') {
+    if (actionType === 'fix') {
+      prompt = `Find bugs, optimize, and fix this snippet cleanly:\n\n${clipboardText}`;
+    } else if (actionType === 'explain') {
       prompt = `Explain this snippet succinctly in 2-3 sentences:\n\n${clipboardText}`;
-    } else if (actionType === 'fix') {
-      prompt = `Find bugs, optimize, and provide the fixed code for this snippet:\n\n${clipboardText}`;
     } else if (actionType === 'summarize') {
       prompt = `Summarize this text in 3 concise bullet points:\n\n${clipboardText}`;
     } else if (actionType === 'format_json') {
-      prompt = `Format, validate, and clean this JSON data:\n\n${clipboardText}`;
-    } else if (actionType === 'proofread') {
-      prompt = `Proofread and polish this text for clear professional tone:\n\n${clipboardText}`;
-    } else if (actionType === 'docs') {
-      prompt = `Add clean docstrings and type annotations to this code:\n\n${clipboardText}`;
+      prompt = `Format, validate, and structure this JSON data:\n\n${clipboardText}`;
+    } else if (actionType === 'telemetry') {
+      prompt = `Show current CPU, RAM, and system telemetry stats.`;
+    } else if (actionType === 'history') {
+      prompt = `Search recent clipboard memory and list active history items.`;
     }
 
     if (prompt) {
@@ -421,26 +439,206 @@ export default function App() {
     }
   };
 
+  const haloSectors = [
+    {
+      id: 'fix',
+      title: 'Fix & Refactor',
+      icon: Sparkles,
+      color: 'amber',
+      x: 0,
+      y: -125,
+      action: () => handleQuickAction('fix')
+    },
+    {
+      id: 'telemetry',
+      title: 'Telemetry Sensors',
+      icon: RotateCw,
+      color: 'emerald',
+      x: 110,
+      y: -65,
+      action: () => handleQuickAction('telemetry')
+    },
+    {
+      id: 'voice',
+      title: isTalking ? 'Stop Streaming' : 'Voice Recon',
+      icon: Mic,
+      color: 'pink',
+      x: 110,
+      y: 65,
+      action: toggleVoice
+    },
+    {
+      id: 'history',
+      title: 'Clipboard Memory',
+      icon: Copy,
+      color: 'cyan',
+      x: 0,
+      y: 125,
+      action: () => handleQuickAction('history')
+    },
+    {
+      id: 'format_json',
+      title: 'Format JSON',
+      icon: FileCode,
+      color: 'purple',
+      x: -110,
+      y: 65,
+      action: () => handleQuickAction('format_json')
+    },
+    {
+      id: 'explain',
+      title: 'Explain & Polish',
+      icon: FileText,
+      color: 'teal',
+      x: -110,
+      y: -65,
+      action: () => handleQuickAction('explain')
+    }
+  ];
+
   return (
     <div className="w-full h-full flex items-center justify-center bg-transparent select-none p-1.5 overflow-hidden font-sans">
       <AnimatePresence mode="wait">
-        {viewMode === 'palette' ? (
+        {viewMode === 'wheel' ? (
           <motion.div
-            key="cursor-palette"
-            layoutId="companion-hud"
+            key="radial-halo-wheel"
+            layoutId="aura-core-container"
+            initial={{ opacity: 0, scale: 0.85 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.85 }}
+            transition={{ type: 'spring', stiffness: 420, damping: 28 }}
+            className="relative w-[390px] h-[390px] flex items-center justify-center"
+          >
+            <div className="absolute inset-4 rounded-full bg-teal-500/5 blur-2xl pointer-events-none" />
+
+            <svg viewBox="0 0 390 390" className="absolute inset-0 w-full h-full pointer-events-none">
+              <circle
+                cx="195"
+                cy="195"
+                r="125"
+                fill="none"
+                stroke="rgba(45, 212, 191, 0.15)"
+                strokeWidth="1.5"
+                strokeDasharray="4 8"
+                className="animate-[spin_60s_linear_infinite]"
+              />
+              <circle
+                cx="195"
+                cy="195"
+                r="150"
+                fill="none"
+                stroke="rgba(56, 189, 248, 0.1)"
+                strokeWidth="1"
+                strokeDasharray="12 12"
+                className="animate-[spin_40s_linear_infinite_reverse]"
+              />
+            </svg>
+
+            <motion.div
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={handleSwitchToCard}
+              className="relative w-[130px] h-[130px] rounded-full bg-[#0d1117]/95 backdrop-blur-2xl border-2 border-teal-400/40 shadow-[0_0_25px_rgba(45,212,191,0.25)] flex flex-col items-center justify-center p-2 text-center cursor-pointer z-10 group"
+              title="Click to open prompt card or expand"
+            >
+              <div className="relative w-5 h-5 flex items-center justify-center mb-1">
+                <span className="w-2.5 h-2.5 rounded-full bg-teal-400 shadow-[0_0_10px_#2dd4bf] animate-ping" />
+                <span className="absolute w-2 h-2 rounded-full bg-teal-300" />
+              </div>
+              <span className="font-mono text-xs font-black text-teal-300 tracking-wider">
+                {companionName.toUpperCase()}
+              </span>
+              <span className="text-[9px] font-mono text-slate-400 mt-0.5">
+                {hoveredSector ? hoveredSector.title : clipboardCategory.toUpperCase()}
+              </span>
+              <div className="flex items-center gap-1 mt-1 text-[8px] font-mono text-teal-400/80">
+                <span>CLICK CORE</span>
+                <ArrowRight className="w-2.5 h-2.5" />
+              </div>
+            </motion.div>
+
+            {haloSectors.map((sector) => {
+              const Icon = sector.icon;
+              const isHovered = hoveredSector?.id === sector.id;
+
+              return (
+                <motion.button
+                  key={sector.id}
+                  onClick={sector.action}
+                  onMouseEnter={() => setHoveredSector(sector)}
+                  onMouseLeave={() => setHoveredSector(null)}
+                  whileHover={{ scale: 1.12 }}
+                  whileTap={{ scale: 0.9 }}
+                  style={{
+                    transform: `translate(${sector.x}px, ${sector.y}px)`
+                  }}
+                  className={`absolute w-14 h-14 rounded-2xl bg-[#161b22]/95 backdrop-blur-xl border flex flex-col items-center justify-center gap-1 cursor-pointer transition-all shadow-xl z-20 ${
+                    isHovered
+                      ? 'border-teal-400 bg-[#1f2937] shadow-[0_0_16px_rgba(45,212,191,0.4)] text-teal-300'
+                      : 'border-teal-500/20 text-slate-300 hover:border-teal-400/60'
+                  }`}
+                  title={sector.title}
+                >
+                  <Icon
+                    className={`w-5 h-5 ${
+                      sector.color === 'amber'
+                        ? 'text-amber-400'
+                        : sector.color === 'emerald'
+                        ? 'text-emerald-400'
+                        : sector.color === 'pink'
+                        ? 'text-pink-400'
+                        : sector.color === 'cyan'
+                        ? 'text-cyan-400'
+                        : sector.color === 'purple'
+                        ? 'text-purple-400'
+                        : 'text-teal-400'
+                    }`}
+                  />
+                  <span className="font-mono text-[8px] font-bold tracking-tight text-center leading-tight">
+                    {sector.id.toUpperCase()}
+                  </span>
+                </motion.button>
+              );
+            })}
+
+            <div className="absolute top-2 right-2 flex items-center gap-1.5 z-30">
+              <button
+                onClick={handleExpandToDashboard}
+                className="w-6 h-6 rounded-lg bg-[#161b22]/90 border border-teal-500/20 hover:bg-teal-500/20 hover:text-teal-300 text-slate-400 flex items-center justify-center transition-all cursor-pointer"
+                title="Expand to Full Tactical HUD (Ctrl+Shift+Y)"
+              >
+                <Maximize2 className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => desktopAPI.anchorToCursor(420, 420)}
+                className="w-6 h-6 rounded-lg bg-[#161b22]/90 border border-rose-500/20 hover:bg-rose-500/80 hover:text-white text-slate-400 flex items-center justify-center transition-all cursor-pointer"
+                title="Dismiss (Esc)"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </motion.div>
+        ) : viewMode === 'card' ? (
+          <motion.div
+            key="liquid-glass-card"
+            layoutId="aura-core-container"
             initial={{ opacity: 0, scale: 0.9, y: -6 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: -6 }}
-            transition={{ type: 'spring', stiffness: 380, damping: 26 }}
-            className="w-[380px] h-[310px] bg-[#0d1117]/95 backdrop-blur-xl border border-teal-500/30 rounded-2xl shadow-2xl overflow-hidden text-slate-100 flex flex-col justify-between p-3"
+            transition={{ type: 'spring', stiffness: 420, damping: 28 }}
+            className="w-[390px] h-[340px] bg-[#0d1117]/95 backdrop-blur-2xl border border-teal-500/30 rounded-2xl shadow-2xl overflow-hidden text-slate-100 flex flex-col justify-between p-3.5 relative"
           >
             <div className="flex items-center justify-between border-b border-teal-500/15 pb-2 flex-shrink-0">
               <div className="flex items-center gap-2">
-                <div className="relative w-3.5 h-3.5 flex items-center justify-center">
-                  <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse shadow-[0_0_8px_#2dd4bf]" />
-                </div>
+                <button
+                  onClick={() => setViewMode('wheel')}
+                  className="p-1 rounded bg-[#161b22] hover:bg-teal-500/20 text-teal-400 cursor-pointer"
+                  title="Back to Radial Halo Wheel"
+                >
+                  <Compass className="w-3.5 h-3.5" />
+                </button>
                 <span className="font-mono text-xs font-bold text-teal-300 tracking-wider">
-                  {companionName.toUpperCase()} PALETTE
+                  {companionName.toUpperCase()} STREAM
                 </span>
                 <span className="bg-teal-500/10 text-teal-300 text-[9px] px-1.5 py-0.5 rounded border border-teal-500/20 font-mono">
                   {clipboardCategory.toUpperCase()}
@@ -451,23 +649,23 @@ export default function App() {
                 <button
                   onClick={handleExpandToDashboard}
                   className="w-5 h-5 rounded-md bg-[#161b22] hover:bg-teal-500/20 hover:text-teal-300 text-slate-400 flex items-center justify-center transition-all cursor-pointer"
-                  title="Expand to Full Landscape HUD (Ctrl+Shift+Y)"
+                  title="Expand to Full HUD"
                 >
-                  <Maximize2 className="w-3 h-3" />
+                  <Maximize2 className="w-3.5 h-3.5" />
                 </button>
                 <button
-                  onClick={() => desktopAPI.anchorToCursor(380, 320)}
+                  onClick={() => setViewMode('wheel')}
                   className="w-5 h-5 rounded-md bg-[#161b22] hover:bg-rose-500/80 hover:text-white text-slate-400 flex items-center justify-center transition-all cursor-pointer"
-                  title="Dismiss / Standby (Esc)"
+                  title="Dismiss (Esc)"
                 >
-                  <X className="w-3 h-3" />
+                  <X className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
 
-            {clipboardText ? (
+            {clipboardText && (
               <div
-                className="bg-[#161b22]/90 border border-teal-500/20 rounded-lg p-2 flex items-start gap-2 cursor-pointer hover:border-teal-400/40 transition-colors flex-shrink-0"
+                className="bg-[#161b22]/90 border border-teal-500/20 rounded-lg p-2 flex items-start gap-2 cursor-pointer hover:border-teal-400/40 transition-colors flex-shrink-0 my-1"
                 onClick={refreshClipboard}
                 title="Click to refresh OS clipboard"
               >
@@ -481,90 +679,7 @@ export default function App() {
                 </p>
                 <Copy className="w-3 h-3 text-slate-500 flex-shrink-0 mt-0.5" />
               </div>
-            ) : (
-              <div
-                className="bg-[#161b22]/50 border border-teal-500/10 rounded-lg p-2 text-center text-[10px] font-mono text-slate-500 cursor-pointer"
-                onClick={refreshClipboard}
-              >
-                Clipboard empty. Copy text anywhere to activate smart action chips.
-              </div>
             )}
-
-            <div className="grid grid-cols-3 gap-1.5 flex-shrink-0">
-              {clipboardCategory === 'code' ? (
-                <>
-                  <button
-                    onClick={() => handleQuickAction('explain')}
-                    className="bg-[#161b22] hover:bg-[#1f242d] border border-teal-500/20 hover:border-cyan-400/50 rounded-lg py-1.5 px-1 flex items-center justify-center gap-1.5 text-slate-200 transition-all cursor-pointer"
-                  >
-                    <Code className="w-3.5 h-3.5 text-cyan-400" />
-                    <span className="font-mono text-[10px] font-bold">Explain</span>
-                  </button>
-                  <button
-                    onClick={() => handleQuickAction('fix')}
-                    className="bg-[#161b22] hover:bg-[#1f242d] border border-teal-500/20 hover:border-amber-400/50 rounded-lg py-1.5 px-1 flex items-center justify-center gap-1.5 text-slate-200 transition-all cursor-pointer"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                    <span className="font-mono text-[10px] font-bold">Fix Bugs</span>
-                  </button>
-                  <button
-                    onClick={() => handleQuickAction('docs')}
-                    className="bg-[#161b22] hover:bg-[#1f242d] border border-teal-500/20 hover:border-emerald-400/50 rounded-lg py-1.5 px-1 flex items-center justify-center gap-1.5 text-slate-200 transition-all cursor-pointer"
-                  >
-                    <FileCode className="w-3.5 h-3.5 text-emerald-400" />
-                    <span className="font-mono text-[10px] font-bold">Add Docs</span>
-                  </button>
-                </>
-              ) : clipboardCategory === 'json' ? (
-                <>
-                  <button
-                    onClick={() => handleQuickAction('format_json')}
-                    className="bg-[#161b22] hover:bg-[#1f242d] border border-teal-500/20 hover:border-cyan-400/50 rounded-lg py-1.5 px-1 flex items-center justify-center gap-1.5 text-slate-200 transition-all cursor-pointer"
-                  >
-                    <Code className="w-3.5 h-3.5 text-cyan-400" />
-                    <span className="font-mono text-[10px] font-bold">Format</span>
-                  </button>
-                  <button
-                    onClick={() => handleQuickAction('fix')}
-                    className="bg-[#161b22] hover:bg-[#1f242d] border border-teal-500/20 hover:border-amber-400/50 rounded-lg py-1.5 px-1 flex items-center justify-center gap-1.5 text-slate-200 transition-all cursor-pointer"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                    <span className="font-mono text-[10px] font-bold">Validate</span>
-                  </button>
-                  <button
-                    onClick={() => handleQuickAction('explain')}
-                    className="bg-[#161b22] hover:bg-[#1f242d] border border-teal-500/20 hover:border-emerald-400/50 rounded-lg py-1.5 px-1 flex items-center justify-center gap-1.5 text-slate-200 transition-all cursor-pointer"
-                  >
-                    <Terminal className="w-3.5 h-3.5 text-emerald-400" />
-                    <span className="font-mono text-[10px] font-bold">Schema</span>
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button
-                    onClick={() => handleQuickAction('summarize')}
-                    className="bg-[#161b22] hover:bg-[#1f242d] border border-teal-500/20 hover:border-cyan-400/50 rounded-lg py-1.5 px-1 flex items-center justify-center gap-1.5 text-slate-200 transition-all cursor-pointer"
-                  >
-                    <FileText className="w-3.5 h-3.5 text-cyan-400" />
-                    <span className="font-mono text-[10px] font-bold">Summarize</span>
-                  </button>
-                  <button
-                    onClick={() => handleQuickAction('proofread')}
-                    className="bg-[#161b22] hover:bg-[#1f242d] border border-teal-500/20 hover:border-amber-400/50 rounded-lg py-1.5 px-1 flex items-center justify-center gap-1.5 text-slate-200 transition-all cursor-pointer"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                    <span className="font-mono text-[10px] font-bold">Proofread</span>
-                  </button>
-                  <button
-                    onClick={() => handleSend('Show me my CPU, RAM and system telemetry.')}
-                    className="bg-[#161b22] hover:bg-[#1f242d] border border-teal-500/20 hover:border-emerald-400/50 rounded-lg py-1.5 px-1 flex items-center justify-center gap-1.5 text-slate-200 transition-all cursor-pointer"
-                  >
-                    <RotateCw className="w-3.5 h-3.5 text-emerald-400" />
-                    <span className="font-mono text-[10px] font-bold">Telemetry</span>
-                  </button>
-                </>
-              )}
-            </div>
 
             <div className="bg-[#161b22]/90 border border-teal-500/15 rounded-lg p-2.5 flex-1 overflow-y-auto my-1 text-xs font-mono text-slate-200 leading-relaxed min-h-0 relative">
               {isThinking ? (
@@ -572,24 +687,24 @@ export default function App() {
                   <span className="w-2 h-2 rounded-full bg-teal-400 animate-ping" />
                   <span>Thinking...</span>
                 </div>
-              ) : paletteResponse ? (
+              ) : streamResponse ? (
                 <div>
-                  <TypewriterText text={paletteResponse} speed={15} />
+                  <TypewriterText text={streamResponse} speed={15} />
                   <button
                     onClick={() => {
-                      navigator.clipboard.writeText(paletteResponse);
+                      navigator.clipboard.writeText(streamResponse);
                       setCopiedResponse(true);
                       setTimeout(() => setCopiedResponse(false), 2000);
                     }}
                     className="absolute top-2 right-2 text-slate-400 hover:text-teal-300 p-1 rounded bg-[#0d1117]/80"
-                    title="Copy AI response"
+                    title="Copy response"
                   >
                     {copiedResponse ? <CheckCheck className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
                   </button>
                 </div>
               ) : (
                 <div className="text-slate-500 text-[11px]">
-                  Use action chips above, type a query below, or speak to stream voice.
+                  Use the quick actions on the Halo Wheel or enter a prompt below.
                 </div>
               )}
             </div>
@@ -599,7 +714,7 @@ export default function App() {
                 e.preventDefault();
                 handleSend();
               }}
-              className="flex items-center gap-2 bg-[#161b22] border border-teal-500/20 focus-within:border-teal-400 rounded-lg px-2 py-1 flex-shrink-0 transition-colors"
+              className="flex items-center gap-2 bg-[#161b22] border border-teal-500/20 focus-within:border-teal-400 rounded-lg px-2 py-1.5 flex-shrink-0 transition-colors"
             >
               <button
                 type="button"
@@ -628,13 +743,13 @@ export default function App() {
           </motion.div>
         ) : (
           <motion.div
-            key="expanded-dashboard"
-            layoutId="companion-hud"
+            key="spatial-tactical-dashboard"
+            layoutId="aura-core-container"
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9 }}
-            transition={{ type: 'spring', stiffness: 350, damping: 25 }}
-            className="w-[1113px] h-[385px] bg-[#0d1117]/95 backdrop-blur-xl border border-teal-500/20 rounded-2xl shadow-2xl overflow-hidden text-slate-100 flex flex-col justify-between relative"
+            transition={{ type: 'spring', stiffness: 380, damping: 26 }}
+            className="w-[1113px] h-[385px] bg-[#0d1117]/95 backdrop-blur-2xl border border-teal-500/20 rounded-2xl shadow-2xl overflow-hidden text-slate-100 flex flex-col justify-between relative"
           >
             <header className="h-[42px] px-5 py-2 flex items-center justify-between border-b border-teal-500/10 bg-[#161b22]/50 flex-shrink-0">
               <div className="flex items-center gap-3">
@@ -669,7 +784,7 @@ export default function App() {
                 )}
 
                 <span className="bg-teal-500/10 border border-teal-500/30 text-teal-300 text-[10px] px-2 py-0.5 rounded-full font-mono font-semibold">
-                  LOCAL AGENT CORE
+                  SPATIAL HUD
                 </span>
               </div>
 
@@ -696,9 +811,9 @@ export default function App() {
                 </span>
 
                 <button
-                  onClick={handleCollapseToPalette}
+                  onClick={handleCollapseToWheel}
                   className="w-6 h-6 rounded-full bg-[#21262d] hover:bg-teal-500/80 hover:text-white text-slate-400 flex items-center justify-center transition-all cursor-pointer"
-                  title="Collapse to Cursor Palette"
+                  title="Collapse to Radial Halo Wheel"
                 >
                   <Minimize2 className="w-3.5 h-3.5" />
                 </button>

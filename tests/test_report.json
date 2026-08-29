@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-08-29 20:55:10",
+  "timestamp": "2026-08-29 21:15:54",
   "health": {
     "ollama": {
       "online": false,
@@ -16,7 +16,7 @@
     {
       "prompt": "Hello",
       "response": "I'm operating offline. Systems status normal.",
-      "elapsed_seconds": 2.05,
+      "elapsed_seconds": 2.07,
       "has_expected_keywords": true,
       "contains_movie_script_language": false,
       "response_length": 45,
@@ -35,18 +35,18 @@
     },
     {
       "prompt": "Show me my CPU usage",
-      "response": "CPU: 16.4% | RAM: 72.1% (11.3/15.7 GB) | Disk: 71.8% (341.5/475.7 GB)",
+      "response": "CPU: 19.2% | RAM: 58.2% (9.1/15.7 GB) | Disk: 71.8% (341.5/475.7 GB)",
       "elapsed_seconds": 2.15,
       "has_expected_keywords": true,
       "contains_movie_script_language": false,
-      "response_length": 69,
+      "response_length": 68,
       "passed": true,
       "test_name": "system_command"
     },
     {
       "prompt": "Write a Python function to reverse a string",
       "response": "I'm operating offline. Systems status normal.",
-      "elapsed_seconds": 2.04,
+      "elapsed_seconds": 2.05,
       "has_expected_keywords": true,
       "contains_movie_script_language": false,
       "response_length": 45,
@@ -56,7 +56,7 @@
     {
       "prompt": "How are you?",
       "response": "I'm operating offline. Systems status normal.",
-      "elapsed_seconds": 2.05,
+      "elapsed_seconds": 2.04,
       "has_expected_keywords": true,
       "contains_movie_script_language": false,
       "response_length": 45,
@@ -86,11 +86,11 @@
     },
     {
       "prompt": "What's my current RAM usage?",
-      "response": "CPU: 35.3% | RAM: 72.1% (11.3/15.7 GB) | Disk: 71.8% (341.5/475.7 GB)",
-      "elapsed_seconds": 2.13,
+      "response": "CPU: 40.0% | RAM: 58.3% (9.1/15.7 GB) | Disk: 71.8% (341.5/475.7 GB)",
+      "elapsed_seconds": 2.14,
       "has_expected_keywords": true,
       "contains_movie_script_language": false,
-      "response_length": 69,
+      "response_length": 68,
       "passed": true,
       "test_name": "tool_usage"
     }
@@ -112,7 +112,7 @@
     },
     {
       "prompt": "List 5 programming languages",
-      "elapsed": 2.15,
+      "elapsed": 2.14,
       "max_allowed": 20.0,
       "passed": true,
       "test_name": "long_response"

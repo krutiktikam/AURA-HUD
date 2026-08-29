@@ -7,8 +7,8 @@ let tray = null;
 let currentState = 'palette'; // 'palette' | 'expanded' | 'compact'
 
 // Dimensions
-const PALETTE_WIDTH = 380;
-const PALETTE_HEIGHT = 320;
+const PALETTE_WIDTH = 420;
+const PALETTE_HEIGHT = 420;
 const COMPACT_WIDTH = 160;
 const COMPACT_HEIGHT = 60;
 const EXPANDED_WIDTH = 1150;
