@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-09-01 20:36:29",
+  "timestamp": "2026-09-01 20:47:29",
   "health": {
     "ollama": {
       "online": false,
@@ -35,11 +35,11 @@
     },
     {
       "prompt": "Show me my CPU usage",
-      "response": "CPU: 20.5% | RAM: 63.0% (9.9/15.7 GB) | Disk: 72.5% (344.7/475.7 GB)",
-      "elapsed_seconds": 2.14,
+      "response": "CPU: 80.8% | RAM: 68.2% (10.7/15.7 GB) | Disk: 72.5% (344.7/475.7 GB)",
+      "elapsed_seconds": 2.15,
       "has_expected_keywords": true,
       "contains_movie_script_language": false,
-      "response_length": 68,
+      "response_length": 69,
       "passed": true,
       "test_name": "system_command"
     },
@@ -86,11 +86,11 @@
     },
     {
       "prompt": "What's my current RAM usage?",
-      "response": "CPU: 63.9% | RAM: 63.1% (9.9/15.7 GB) | Disk: 72.5% (344.7/475.7 GB)",
-      "elapsed_seconds": 2.16,
+      "response": "CPU: 74.1% | RAM: 69.7% (10.9/15.7 GB) | Disk: 72.5% (344.7/475.7 GB)",
+      "elapsed_seconds": 2.15,
       "has_expected_keywords": true,
       "contains_movie_script_language": false,
-      "response_length": 68,
+      "response_length": 69,
       "passed": true,
       "test_name": "tool_usage"
     }
@@ -98,14 +98,14 @@
   "latency_results": [
     {
       "prompt": "Hi",
-      "elapsed": 2.04,
+      "elapsed": 2.05,
       "max_allowed": 10.0,
       "passed": true,
       "test_name": "fast_response"
     },
     {
       "prompt": "Explain what you do in 2 sentences",
-      "elapsed": 2.05,
+      "elapsed": 2.04,
       "max_allowed": 15.0,
       "passed": true,
       "test_name": "medium_response"

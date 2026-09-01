@@ -31,26 +31,133 @@ html, body, #root {
   background: rgba(45, 212, 191, 0.6);
 }
 
-/* Mint-White Glass Styling */
-.glass-panel {
-  background: rgba(13, 23, 28, 0.75);
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
-  border: 1px solid rgba(204, 251, 241, 0.18);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), inset 0 1px 1px rgba(255, 255, 255, 0.15), 0 0 25px rgba(45, 212, 191, 0.08);
+/* ========================================================================= */
+/* LIQUID GLASS SYSTEM (MACOS-INSPIRED OPTICAL REFRACTION & SPECULAR RIMS)   */
+/* ========================================================================= */
+
+/* Main Extended Container */
+.liquid-glass-container {
+  position: relative;
+  background: rgba(10, 18, 25, 0.72);
+  border-radius: 28px;
+  overflow: hidden;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.65), 0 0 40px rgba(45, 212, 191, 0.12);
+  isolation: isolate;
 }
 
-.glass-node {
-  background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.15), rgba(15, 23, 42, 0.85));
+.liquid-glass-container::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  border-radius: 28px;
+  box-shadow: 
+    inset 2px 2px 0px -1.5px rgba(255, 255, 255, 0.75),
+    inset -1px -1px 0px -0.5px rgba(204, 251, 241, 0.35),
+    inset 0 0 3px 1px rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.liquid-glass-container::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  border-radius: 28px;
+  backdrop-filter: blur(28px) saturate(190%);
+  -webkit-backdrop-filter: blur(28px) saturate(190%);
+  filter: url(#container-glass);
+  -webkit-filter: url(#container-glass);
+  overflow: hidden;
+}
+
+/* Liquid Glass Circular Button / Node */
+.liquid-glass-node {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: rgba(15, 24, 34, 0.65);
+  border-radius: 9999px;
+  outline: none;
+  border: none;
+  z-index: 0;
+  isolation: isolate;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
+}
+
+.liquid-glass-node::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  overflow: hidden;
+  border-radius: 9999px;
+  box-shadow: 
+    inset 2px 2px 0px -1px rgba(255, 255, 255, 0.85),
+    inset -1px -1px 0px -0.5px rgba(204, 251, 241, 0.4),
+    inset 0 0 4px 1px rgba(255, 255, 255, 0.7);
+  background-color: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.liquid-glass-node::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  border-radius: 9999px;
+  backdrop-filter: blur(18px) saturate(180%);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  filter: url(#btn-glass);
+  -webkit-filter: url(#btn-glass);
+  overflow: hidden;
+}
+
+.liquid-glass-node:hover {
+  box-shadow: 0 0 25px rgba(45, 212, 191, 0.5), 0 0 45px rgba(56, 189, 248, 0.3);
+}
+
+.liquid-glass-node:hover::before {
+  background-color: rgba(255, 255, 255, 0.18);
+  box-shadow: 
+    inset 2px 2px 0px -1px rgba(255, 255, 255, 0.95),
+    inset 0 0 6px 2px rgba(204, 251, 241, 0.9);
+}
+
+/* Liquid Glass Card Inner Panel */
+.liquid-glass-card {
+  position: relative;
+  background: rgba(13, 22, 30, 0.6);
+  border-radius: 18px;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.liquid-glass-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  border-radius: 18px;
+  box-shadow: 
+    inset 1.5px 1.5px 0px -1px rgba(255, 255, 255, 0.65),
+    inset 0 0 3px 1px rgba(255, 255, 255, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.liquid-glass-card::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  border-radius: 18px;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(224, 242, 254, 0.25);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), inset 0 1px 2px rgba(255, 255, 255, 0.3);
-}
-
-.glass-node:hover {
-  border-color: rgba(204, 251, 241, 0.7);
-  box-shadow: 0 0 20px rgba(45, 212, 191, 0.4), inset 0 1px 3px rgba(255, 255, 255, 0.5);
 }
 
 /* Sci-fi HUD Background Grid Overlay */

@@ -134,7 +134,7 @@ export default function App() {
     {
       id: 1,
       sender: 'companion',
-      text: 'AURA MINT GLASS HUD READY: Holographic Halo Wheel online. Press Ctrl+Shift+A anywhere.'
+      text: 'AURA LIQUID GLASS HUD READY: Refractive macOS Halo Wheel active. Press Ctrl+Shift+A anywhere.'
     }
   ]);
   const [inputText, setInputText] = useState('');
@@ -485,7 +485,6 @@ export default function App() {
       x: -190,
       y: -120,
       ringColor: '#a855f7',
-      ringClass: 'stroke-purple-400',
       action: () => handleNodeAction('options')
     },
     {
@@ -497,7 +496,6 @@ export default function App() {
       x: -215,
       y: -25,
       ringColor: '#818cf8',
-      ringClass: 'stroke-indigo-400',
       action: () => handleNodeAction('explain')
     },
     {
@@ -509,7 +507,6 @@ export default function App() {
       x: -215,
       y: 75,
       ringColor: '#a855f7',
-      ringClass: 'stroke-purple-400',
       action: () => handleNodeAction('memory')
     },
     {
@@ -521,7 +518,6 @@ export default function App() {
       x: -185,
       y: 165,
       ringColor: '#f43f5e',
-      ringClass: 'stroke-rose-400',
       action: () => handleNodeAction('telemetry')
     },
     {
@@ -533,7 +529,6 @@ export default function App() {
       x: 190,
       y: -120,
       ringColor: '#a855f7',
-      ringClass: 'stroke-purple-400',
       action: () => handleNodeAction('format_json')
     },
     {
@@ -545,7 +540,6 @@ export default function App() {
       x: 215,
       y: -25,
       ringColor: '#ec4899',
-      ringClass: 'stroke-pink-400',
       action: () => handleNodeAction('refactor')
     },
     {
@@ -557,7 +551,6 @@ export default function App() {
       x: 215,
       y: 75,
       ringColor: '#d946ef',
-      ringClass: 'stroke-fuchsia-400',
       action: () => handleNodeAction('voice')
     },
     {
@@ -569,7 +562,6 @@ export default function App() {
       x: 185,
       y: 165,
       ringColor: '#fb923c',
-      ringClass: 'stroke-amber-400',
       action: () => handleNodeAction('summarize')
     }
   ];
@@ -578,6 +570,19 @@ export default function App() {
 
   return (
     <div className="w-full h-full flex items-center justify-center bg-transparent select-none p-2 overflow-hidden font-sans">
+      <svg style={{ position: 'absolute', width: 0, height: 0, pointerEvents: 'none' }} aria-hidden="true">
+        <defs>
+          <filter id="container-glass" x="0%" y="0%" width="100%" height="100%">
+            <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="1" result="noise" />
+            <feDisplacementMap in="SourceGraphic" in2="noise" scale="4" xChannelSelector="R" yChannelSelector="G" />
+          </filter>
+          <filter id="btn-glass" x="0%" y="0%" width="100%" height="100%">
+            <feTurbulence type="fractalNoise" baseFrequency="0.07" numOctaves="1" result="noise" />
+            <feDisplacementMap in="SourceGraphic" in2="noise" scale="3" xChannelSelector="R" yChannelSelector="G" />
+          </filter>
+        </defs>
+      </svg>
+
       <AnimatePresence mode="wait">
         {viewMode === 'wheel' ? (
           <motion.div
@@ -589,21 +594,9 @@ export default function App() {
             transition={{ type: 'spring', stiffness: 360, damping: 28 }}
             className="relative w-[600px] h-[540px] flex items-center justify-center"
           >
-            <div className="absolute w-[460px] h-[460px] rounded-full bg-gradient-to-tr from-cyan-500/10 via-teal-400/15 to-transparent blur-3xl pointer-events-none" />
+            <div className="absolute w-[480px] h-[480px] rounded-full bg-gradient-to-tr from-cyan-500/10 via-teal-400/15 to-purple-500/10 blur-3xl pointer-events-none" />
 
             <svg viewBox="0 0 600 540" className="absolute inset-0 w-full h-full pointer-events-none z-0">
-              <defs>
-                <linearGradient id="rayGlow" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="rgba(45, 212, 191, 0.4)" />
-                  <stop offset="100%" stopColor="rgba(168, 85, 247, 0.2)" />
-                </linearGradient>
-                <linearGradient id="coreMintGlow" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#2dd4bf" stopOpacity="0.8" />
-                  <stop offset="50%" stopColor="#38bdf8" stopOpacity="0.6" />
-                  <stop offset="100%" stopColor="#0f172a" stopOpacity="0.95" />
-                </linearGradient>
-              </defs>
-
               <circle
                 cx="300"
                 cy="260"
@@ -632,7 +625,7 @@ export default function App() {
                   y1="260"
                   x2={300 + node.x}
                   y2={260 + node.y}
-                  stroke={hoveredNode?.id === node.id ? 'rgba(45, 212, 191, 0.6)' : 'rgba(204, 251, 241, 0.12)'}
+                  stroke={hoveredNode?.id === node.id ? 'rgba(45, 212, 191, 0.7)' : 'rgba(204, 251, 241, 0.15)'}
                   strokeWidth={hoveredNode?.id === node.id ? '1.5' : '1'}
                   strokeDasharray={hoveredNode?.id === node.id ? 'none' : '3 4'}
                   className="transition-all duration-300"
@@ -646,10 +639,10 @@ export default function App() {
                   scale: isTalking || isSpeakingTTS ? [1, 1.05, 1] : isThinking ? [1, 1.03, 1] : [1, 1.015, 1],
                   filter:
                     isTalking || isSpeakingTTS
-                      ? 'drop-shadow(0 0 40px rgba(45,212,191,0.9)) drop-shadow(0 0 70px rgba(56,189,248,0.7))'
+                      ? 'drop-shadow(0 0 40px rgba(45,212,191,0.95)) drop-shadow(0 0 70px rgba(56,189,248,0.75))'
                       : isThinking
-                      ? 'drop-shadow(0 0 30px rgba(251,191,36,0.8))'
-                      : 'drop-shadow(0 0 25px rgba(45,212,191,0.5)) drop-shadow(0 0 50px rgba(56,189,248,0.3))'
+                      ? 'drop-shadow(0 0 30px rgba(251,191,36,0.85))'
+                      : 'drop-shadow(0 0 25px rgba(45,212,191,0.55)) drop-shadow(0 0 50px rgba(56,189,248,0.35))'
                 }}
                 transition={{
                   duration: isTalking ? 1.2 : 3,
@@ -720,7 +713,7 @@ export default function App() {
                     onMouseLeave={() => setHoveredNode(null)}
                     whileHover={{ scale: 1.15 }}
                     whileTap={{ scale: 0.92 }}
-                    className="relative w-[52px] h-[52px] rounded-full flex items-center justify-center cursor-pointer transition-all focus:outline-none"
+                    className="liquid-glass-node w-[54px] h-[54px] p-2 focus:outline-none"
                     title={node.label}
                   >
                     <svg viewBox="0 0 52 52" className="absolute inset-0 w-full h-full pointer-events-none">
@@ -745,10 +738,10 @@ export default function App() {
                       />
                     </svg>
 
-                    <div className="w-[38px] h-[38px] rounded-full bg-[#0e1620]/90 border border-teal-200/30 backdrop-blur-xl shadow-lg flex items-center justify-center text-slate-100 group-hover:border-teal-300">
+                    <div className="w-[38px] h-[38px] rounded-full flex items-center justify-center text-slate-100 z-10">
                       <Icon
                         className="w-4 h-4 transition-transform duration-200"
-                        style={{ color: isHovered ? '#2dd4bf' : '#e2e8f0' }}
+                        style={{ color: isHovered ? '#2dd4bf' : '#ffffff' }}
                       />
                     </div>
                   </motion.button>
@@ -774,20 +767,20 @@ export default function App() {
             <div className="absolute bottom-3 inset-x-0 flex justify-center z-30">
               <button
                 onClick={() => desktopAPI.anchorToCursor(620, 580)}
-                className="flex items-center gap-1.5 font-mono text-[11px] font-bold tracking-widest text-teal-300 hover:text-white bg-[#0e1620]/80 hover:bg-rose-500/20 border border-teal-500/20 hover:border-rose-400/50 px-4 py-1.5 rounded-full backdrop-blur-xl transition-all shadow-md cursor-pointer"
+                className="liquid-glass-card flex items-center gap-1.5 font-mono text-[11px] font-bold tracking-widest text-teal-300 hover:text-white px-4 py-1.5 rounded-full transition-all shadow-md cursor-pointer hover:border-teal-400"
               >
-                <X className="w-3.5 h-3.5 text-teal-400" />
-                <span>CLOSE</span>
+                <X className="w-3.5 h-3.5 text-teal-400 z-10" />
+                <span className="z-10">CLOSE</span>
               </button>
             </div>
 
             <div className="absolute top-2 right-4 z-30">
               <button
                 onClick={handleExpandToDashboard}
-                className="w-8 h-8 rounded-full bg-[#0e1620]/80 hover:bg-teal-500/20 border border-teal-500/30 text-teal-300 flex items-center justify-center transition-all cursor-pointer shadow-lg"
+                className="liquid-glass-node w-8 h-8 rounded-full text-teal-300 flex items-center justify-center transition-all cursor-pointer shadow-lg"
                 title="Expand to Full Tactical Dashboard (Ctrl+Shift+Y)"
               >
-                <Maximize2 className="w-3.5 h-3.5" />
+                <Maximize2 className="w-3.5 h-3.5 z-10" />
               </button>
             </div>
           </motion.div>
@@ -799,9 +792,9 @@ export default function App() {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.92 }}
             transition={{ type: 'spring', stiffness: 360, damping: 28 }}
-            className="w-[1150px] h-[450px] glass-panel rounded-3xl shadow-2xl overflow-hidden text-slate-100 flex flex-col justify-between relative border border-teal-200/25"
+            className="w-[1150px] h-[450px] liquid-glass-container text-slate-100 flex flex-col justify-between relative"
           >
-            <header className="h-[46px] px-6 py-2 flex items-center justify-between border-b border-teal-500/15 bg-[#0a1118]/60 backdrop-blur-xl flex-shrink-0">
+            <header className="h-[46px] px-6 py-2 flex items-center justify-between border-b border-teal-500/15 bg-[#0a1118]/60 backdrop-blur-xl flex-shrink-0 z-10">
               <div className="flex items-center gap-3">
                 {isEditingName ? (
                   <div className="flex items-center gap-1.5 bg-[#0d1117] border border-teal-400 px-2.5 py-0.5 rounded-lg">
@@ -828,14 +821,14 @@ export default function App() {
                   >
                     <div className="w-2.5 h-2.5 rounded-full bg-teal-400 shadow-[0_0_8px_#2dd4bf] animate-ping" />
                     <span className="text-teal-300 font-mono font-extrabold tracking-widest text-sm uppercase">
-                      {companionName} MANDALA HUD
+                      {companionName} LIQUID GLASS HUD
                     </span>
                     <Edit3 className="w-3.5 h-3.5 text-slate-400 group-hover:text-teal-300 transition-colors" />
                   </div>
                 )}
 
                 <span className="bg-teal-500/10 border border-teal-400/30 text-teal-200 text-[10px] px-2.5 py-0.5 rounded-full font-mono font-semibold tracking-wide">
-                  MINT GLASS CORE
+                  MACOS OPTICS
                 </span>
               </div>
 
@@ -846,15 +839,15 @@ export default function App() {
                     setIsMemoryOpen(next);
                     if (next) loadMemory();
                   }}
-                  className={`flex items-center gap-1.5 px-3 py-1 rounded-lg font-mono text-xs border transition-all cursor-pointer ${
+                  className={`liquid-glass-card flex items-center gap-1.5 px-3 py-1 rounded-lg font-mono text-xs border transition-all cursor-pointer ${
                     isMemoryOpen
-                      ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200 shadow-[0_0_12px_rgba(56,189,248,0.35)]'
-                      : 'bg-[#0e1620]/80 border-teal-500/20 text-slate-300 hover:text-teal-200 hover:border-teal-400/40'
+                      ? 'border-cyan-400 text-cyan-200 shadow-[0_0_12px_rgba(56,189,248,0.35)]'
+                      : 'text-slate-300 hover:text-teal-200 hover:border-teal-400/40'
                   }`}
                   title="View / Inspect Working Memory"
                 >
-                  <Brain className="w-3.5 h-3.5" />
-                  <span>MEMORY ({memoryList.length})</span>
+                  <Brain className="w-3.5 h-3.5 z-10" />
+                  <span className="z-10">MEMORY ({memoryList.length})</span>
                 </button>
 
                 <span className="bg-amber-400/10 border border-amber-400/30 text-amber-300 text-xs px-3 py-1 rounded-lg font-mono font-semibold tracking-wide">
@@ -863,24 +856,24 @@ export default function App() {
 
                 <button
                   onClick={handleCollapseToWheel}
-                  className="w-7 h-7 rounded-full bg-[#0e1620]/80 hover:bg-teal-500/80 hover:text-white text-slate-300 border border-teal-500/20 flex items-center justify-center transition-all cursor-pointer shadow-md"
+                  className="liquid-glass-node w-7 h-7 rounded-full text-slate-300 flex items-center justify-center transition-all cursor-pointer shadow-md"
                   title="Collapse to Mandala Wheel (Esc)"
                 >
-                  <Minimize2 className="w-4 h-4" />
+                  <Minimize2 className="w-4 h-4 z-10" />
                 </button>
               </div>
             </header>
 
-            <main className="grid grid-cols-12 gap-5 p-5 flex-1 min-h-0 relative bg-hud-grid">
+            <main className="grid grid-cols-12 gap-5 p-5 flex-1 min-h-0 relative bg-hud-grid z-10">
               <AnimatePresence>
                 {isMemoryOpen && (
                   <motion.div
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
-                    className="absolute inset-x-5 top-5 bottom-5 bg-[#0a1118]/98 border border-cyan-400/30 rounded-2xl p-5 z-20 flex flex-col justify-between shadow-2xl backdrop-blur-2xl font-mono"
+                    className="liquid-glass-container absolute inset-x-5 top-5 bottom-5 p-5 z-20 flex flex-col justify-between shadow-2xl font-mono"
                   >
-                    <div className="flex items-center justify-between border-b border-teal-500/20 pb-3 flex-shrink-0">
+                    <div className="flex items-center justify-between border-b border-teal-500/20 pb-3 flex-shrink-0 z-10">
                       <div className="flex items-center gap-2 text-cyan-300 font-bold text-sm">
                         <Brain className="w-4 h-4" /> {companionName}'S ACTIVE WORKING MEMORY
                         <span className="text-xs text-slate-400 font-normal">({memoryList.length} turns)</span>
@@ -898,7 +891,7 @@ export default function App() {
                       </div>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto my-3 pr-2 flex flex-col gap-2.5 text-xs">
+                    <div className="flex-1 overflow-y-auto my-3 pr-2 flex flex-col gap-2.5 text-xs z-10">
                       {memoryList.length === 0 ? (
                         <div className="text-slate-500 text-center py-10">Memory buffer is clear.</div>
                       ) : (
@@ -907,8 +900,8 @@ export default function App() {
                             key={idx}
                             className={`p-3 rounded-xl border ${
                               item.role === 'user'
-                                ? 'bg-[#131d27] border-amber-500/30 text-amber-200'
-                                : 'bg-[#0f1722] border-cyan-500/30 text-slate-200'
+                                ? 'bg-[#131d27]/90 border-amber-500/30 text-amber-200'
+                                : 'bg-[#0f1722]/90 border-cyan-500/30 text-slate-200'
                             }`}
                           >
                             <div className="font-bold text-[10px] text-slate-400 mb-1">
@@ -924,24 +917,24 @@ export default function App() {
               </AnimatePresence>
 
               <section className="col-span-3 flex flex-col gap-4">
-                <div className="bg-[#0e1620]/80 border border-teal-500/20 rounded-2xl p-4 flex items-center gap-4">
-                  <div className="relative w-16 h-16 flex-shrink-0 flex items-center justify-center">
+                <div className="liquid-glass-card p-4 flex items-center gap-4">
+                  <div className="relative w-16 h-16 flex-shrink-0 flex items-center justify-center z-10">
                     <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-teal-400 to-cyan-500 blur-md opacity-50" />
                     <div className="relative w-14 h-14 rounded-full bg-[#0a1118] border border-teal-300/40 flex items-center justify-center">
                       <div className="w-4 h-4 rounded-full bg-teal-400 shadow-[0_0_10px_#2dd4bf] animate-ping" />
                     </div>
                   </div>
-                  <div className="flex flex-col font-mono">
+                  <div className="flex flex-col font-mono z-10">
                     <span className="text-xs font-bold text-teal-200 tracking-wider">SPECTRUM 51 dB</span>
-                    <span className="text-[10px] text-emerald-400 font-bold mt-0.5">MANDALA ONLINE</span>
+                    <span className="text-[10px] text-emerald-400 font-bold mt-0.5">LIQUID CORE ACTIVE</span>
                     <div className="mt-2 w-full">
                       <AnimatedEQMeter isTalking={isTalking} isThinking={isThinking} isSpeaking={isSpeakingTTS} />
                     </div>
                   </div>
                 </div>
 
-                <div className="bg-[#0e1620]/80 border border-teal-500/20 rounded-2xl p-4 flex items-center gap-4 flex-1">
-                  <div className="relative w-16 h-16 flex-shrink-0 flex items-center justify-center">
+                <div className="liquid-glass-card p-4 flex items-center gap-4 flex-1">
+                  <div className="relative w-16 h-16 flex-shrink-0 flex items-center justify-center z-10">
                     <svg viewBox="0 0 80 80" className="w-full h-full transform -rotate-90">
                       <circle cx="40" cy="40" r="32" fill="none" stroke="#1e293b" strokeWidth="6" />
                       <circle
@@ -957,7 +950,7 @@ export default function App() {
                       />
                     </svg>
                   </div>
-                  <div className="flex flex-col gap-2 font-mono">
+                  <div className="flex flex-col gap-2 font-mono z-10">
                     <div className="text-[11px] font-bold text-slate-100 flex items-center gap-1.5">
                       <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_6px_#38bdf8]" />
                       1.32 <small className="text-[9px] text-slate-400">OF 2.0 GB</small>
@@ -973,66 +966,66 @@ export default function App() {
               <section className="col-span-3 grid grid-cols-2 gap-3">
                 <button
                   onClick={toggleVoice}
-                  className={`border rounded-2xl p-3 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all shadow-md ${
+                  className={`liquid-glass-card p-3 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all shadow-md ${
                     isTalking
-                      ? 'border-pink-400 bg-pink-500/20 text-pink-300 shadow-[0_0_15px_rgba(244,114,182,0.4)] animate-pulse'
-                      : 'bg-[#0e1620]/80 border-teal-500/20 hover:border-teal-300/50 hover:bg-[#131e2b] text-slate-200'
+                      ? 'border-pink-400 text-pink-300 shadow-[0_0_15px_rgba(244,114,182,0.4)] animate-pulse'
+                      : 'hover:border-teal-300/50 text-slate-200'
                   }`}
                   title={isTalking ? 'Click to stop voice streaming' : 'Click to stream live 16kHz PCM'}
                 >
-                  <Mic className={`w-5 h-5 ${isTalking ? 'text-pink-400 scale-110' : 'text-teal-300'}`} />
-                  <span className="font-mono font-bold text-[11px] text-center">
+                  <Mic className={`w-5 h-5 z-10 ${isTalking ? 'text-pink-400 scale-110' : 'text-teal-300'}`} />
+                  <span className="font-mono font-bold text-[11px] text-center z-10">
                     {isTalking ? 'STREAMING' : 'RECON VOICE'}
                   </span>
                 </button>
 
                 <button
                   onClick={() => handleSend(null, 'ENGAGE')}
-                  className="bg-[#0e1620]/80 border border-teal-500/20 hover:border-amber-400/50 hover:bg-[#131e2b] text-slate-200 rounded-2xl p-3 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all shadow-md active:scale-95 group"
+                  className="liquid-glass-card hover:border-amber-400/50 text-slate-200 p-3 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all shadow-md active:scale-95 group"
                 >
-                  <Zap className="w-5 h-5 text-amber-300 group-hover:scale-110 transition-transform" />
-                  <span className="font-mono font-bold text-[11px] text-center">ENGAGE</span>
+                  <Zap className="w-5 h-5 text-amber-300 group-hover:scale-110 transition-transform z-10" />
+                  <span className="font-mono font-bold text-[11px] text-center z-10">ENGAGE</span>
                 </button>
 
                 <button
                   onClick={() => handleSend('Get system telemetry and status.', 'TELEMETRY')}
-                  className="bg-[#0e1620]/80 border border-teal-500/20 hover:border-teal-300/50 hover:bg-[#131e2b] text-slate-200 rounded-2xl p-3 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all shadow-md active:scale-95 group"
+                  className="liquid-glass-card hover:border-teal-300/50 text-slate-200 p-3 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all shadow-md active:scale-95 group"
                 >
-                  <RotateCw className="w-5 h-5 text-teal-300 group-hover:rotate-45 transition-transform" />
-                  <span className="font-mono font-bold text-[11px] text-center">TELEMETRY</span>
+                  <RotateCw className="w-5 h-5 text-teal-300 group-hover:rotate-45 transition-transform z-10" />
+                  <span className="font-mono font-bold text-[11px] text-center z-10">TELEMETRY</span>
                 </button>
 
                 <button
                   onClick={() => setIsMuted(!isMuted)}
-                  className={`border rounded-2xl p-3 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all shadow-md ${
+                  className={`liquid-glass-card p-3 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all shadow-md ${
                     isMuted
-                      ? 'border-rose-400 bg-rose-500/20 text-rose-300 shadow-[0_0_15px_rgba(251,113,133,0.4)]'
-                      : 'bg-[#0e1620]/80 border-teal-500/20 hover:border-teal-300/50 hover:bg-[#131e2b] text-slate-200'
+                      ? 'border-rose-400 text-rose-300 shadow-[0_0_15px_rgba(251,113,133,0.4)]'
+                      : 'hover:border-teal-300/50 text-slate-200'
                   }`}
                 >
-                  <VolumeX className="w-5 h-5 text-rose-400" />
-                  <span className="font-mono font-bold text-[11px] text-center">
+                  <VolumeX className="w-5 h-5 text-rose-400 z-10" />
+                  <span className="font-mono font-bold text-[11px] text-center z-10">
                     {isMuted ? 'MUTED' : 'MUTE'}
                   </span>
                 </button>
               </section>
 
-              <section className="col-span-6 bg-[#0a1118]/80 border border-teal-500/20 rounded-2xl p-4 flex flex-col justify-between flex-1 min-h-0 relative overflow-hidden backdrop-blur-xl">
-                <div className="flex items-center justify-between border-b border-teal-500/15 pb-2.5 flex-shrink-0">
+              <section className="col-span-6 liquid-glass-card p-4 flex flex-col justify-between flex-1 min-h-0 relative overflow-hidden">
+                <div className="flex items-center justify-between border-b border-teal-500/15 pb-2.5 flex-shrink-0 z-10">
                   <span className="font-mono text-xs font-bold text-teal-300 tracking-wider flex items-center gap-1.5">
                     <Terminal className="w-4 h-4" /> RIGEL NEURAL STREAM
                   </span>
-                  <span className="font-mono text-[10px] text-slate-400">ø13_49 // MANDALA</span>
+                  <span className="font-mono text-[10px] text-slate-400">ø13_49 // LIQUID</span>
                 </div>
 
-                <div className="flex-1 overflow-y-auto py-3 my-1 flex flex-col gap-2.5 font-mono text-xs pr-1">
+                <div className="flex-1 overflow-y-auto py-3 my-1 flex flex-col gap-2.5 font-mono text-xs pr-1 z-10">
                   {messages.map((m, idx) => (
                     <div
                       key={m.id}
                       className={`p-3 rounded-xl border leading-relaxed ${
                         m.sender === 'user'
-                          ? 'bg-[#151f2a] border-amber-400/30 text-amber-100 self-end max-w-[85%]'
-                          : 'bg-[#0b131c] border-teal-400/30 text-slate-200 self-start max-w-[95%]'
+                          ? 'bg-[#151f2a]/90 border-amber-400/30 text-amber-100 self-end max-w-[85%]'
+                          : 'bg-[#0b131c]/90 border-teal-400/30 text-slate-200 self-start max-w-[95%]'
                       }`}
                     >
                       <div className="text-[10px] font-bold mb-1 flex items-center gap-1">
@@ -1050,7 +1043,7 @@ export default function App() {
                     </div>
                   ))}
                   {isThinking && (
-                    <div className="p-3 rounded-xl border bg-[#0b131c] border-teal-400/30 text-teal-200 self-start">
+                    <div className="p-3 rounded-xl border bg-[#0b131c]/90 border-teal-400/30 text-teal-200 self-start">
                       <div className="text-[10px] font-bold mb-1 text-teal-300">❖ {companionName.toUpperCase()}</div>
                       <span className="animate-pulse">⚡ Invoking local agent & sensor tools...</span>
                     </div>
@@ -1068,7 +1061,7 @@ export default function App() {
                     e.preventDefault();
                     handleSend(null, 'PROMPT');
                   }}
-                  className="border-t border-teal-500/20 bg-transparent text-xs font-mono text-slate-100 flex items-center gap-2 pt-2.5 flex-shrink-0"
+                  className="border-t border-teal-500/20 bg-transparent text-xs font-mono text-slate-100 flex items-center gap-2 pt-2.5 flex-shrink-0 z-10"
                 >
                   <span className="text-teal-300 font-bold text-sm">►</span>
                   <input
@@ -1088,10 +1081,10 @@ export default function App() {
               </section>
             </main>
 
-            <footer className="h-[32px] px-6 flex items-center justify-between border-t border-teal-500/15 bg-[#0a1118]/40 text-[11px] font-mono text-slate-400 opacity-80 flex-shrink-0">
+            <footer className="h-[32px] px-6 flex items-center justify-between border-t border-teal-500/15 bg-[#0a1118]/40 text-[11px] font-mono text-slate-400 opacity-80 flex-shrink-0 z-10">
               <div>CYCLES <span className="text-teal-300 font-semibold">13,607</span></div>
               <div>SPECTRUM <span className="text-teal-300 font-semibold">136 AQI</span></div>
-              <div>STATUS <span className="text-teal-300 font-semibold">MANDALA ACTIVE</span></div>
+              <div>STATUS <span className="text-teal-300 font-semibold">LIQUID GLASS ACTIVE</span></div>
             </footer>
           </motion.div>
         )}
