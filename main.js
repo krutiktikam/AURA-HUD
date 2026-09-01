@@ -7,12 +7,12 @@ let tray = null;
 let currentState = 'palette'; // 'palette' | 'expanded' | 'compact'
 
 // Dimensions
-const PALETTE_WIDTH = 420;
-const PALETTE_HEIGHT = 420;
+const PALETTE_WIDTH = 620;
+const PALETTE_HEIGHT = 580;
 const COMPACT_WIDTH = 160;
 const COMPACT_HEIGHT = 60;
-const EXPANDED_WIDTH = 1150;
-const EXPANDED_HEIGHT = 420;
+const EXPANDED_WIDTH = 1180;
+const EXPANDED_HEIGHT = 480;
 
 function anchorToCursor(width = PALETTE_WIDTH, height = PALETTE_HEIGHT) {
   if (!win || win.isDestroyed()) return null;

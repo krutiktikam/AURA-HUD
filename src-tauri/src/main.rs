@@ -14,10 +14,10 @@ struct ClipboardContent {
     has_content: bool,
 }
 
-const PALETTE_WIDTH: f64 = 420.0;
-const PALETTE_HEIGHT: f64 = 420.0;
-const EXPANDED_WIDTH: f64 = 1150.0;
-const EXPANDED_HEIGHT: f64 = 420.0;
+const PALETTE_WIDTH: f64 = 620.0;
+const PALETTE_HEIGHT: f64 = 580.0;
+const EXPANDED_WIDTH: f64 = 1180.0;
+const EXPANDED_HEIGHT: f64 = 480.0;
 
 /// Snaps the HUD directly beside the OS cursor with multi-monitor edge protection
 #[tauri::command]
