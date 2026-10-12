@@ -1,38 +1,36 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "AI Companion",
+  "productName": "AURA HUD",
   "version": "1.0.0",
-  "identifier": "com.ai-companion.device",
+  "identifier": "com.aura.hud.device",
   "build": {
     "frontendDist": "../ui/dist",
-    "devPath": "http://localhost:3000",
-    "beforeDevCommand": "cd ../ui && npm run dev",
+    "devUrl": "http://localhost:3000",
+    "beforeDevCommand": "npm run start-ui",
     "beforeBuildCommand": "cd ../ui && npm run build"
   },
   "app": {
     "windows": [
       {
-        "title": "AI Companion",
-        "width": 160,
-        "height": 60,
-        "resizable": false,
+        "title": "AURA HUD",
+        "width": 620,
+        "height": 580,
+        "resizable": true,
         "fullscreen": false,
         "decorations": false,
         "transparent": true,
         "alwaysOnTop": true,
         "skipTaskbar": false,
-        "center": false,
+        "center": true,
         "visible": true,
         "shadow": false,
-        "maximizable": false,
-        "minimizable": true,
-        "x": null,
-        "y": 10
+        "maximizable": true,
+        "minimizable": false
       }
     ],
     "trayIcon": {
       "iconPath": "icons/32x32.png",
-      "tooltip": "AI Companion - Dynamic HUD"
+      "tooltip": "AURA HUD - AI Desktop Companion"
     },
     "security": {
       "csp": null
@@ -47,6 +45,9 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
+    ],
+    "externalBin": [
+      "bin/aura-backend"
     ],
     "windows": {
       "wix": {
