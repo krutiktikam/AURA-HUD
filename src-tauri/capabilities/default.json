@@ -5,6 +5,7 @@
   "windows": ["main"],
   "permissions": [
     "core:default",
+    "core:app:default",
     "core:window:default",
     "core:window:allow-hide",
     "core:window:allow-show",
@@ -13,7 +14,7 @@
     "core:window:allow-set-size",
     "core:window:allow-set-position",
     "core:window:allow-current-monitor",
-    "system-tray:default",
+    "core:tray:default",
     "global-shortcut:default"
   ]
 }

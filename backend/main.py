@@ -1,16 +1,35 @@
-import asyncio
-import json
-import time
-import logging
-from typing import List, Dict, Any, Optional
+import sys
+import os
+
+# --- MUST BE AT THE VERY TOP BEFORE ANY BACKEND IMPORTS ---
+if getattr(sys, 'frozen', False):
+    # PyInstaller extracts files to sys._MEIPASS
+    # The backend package is located directly in sys._MEIPASS when we build from the project root
+    bundle_dir = sys._MEIPASS
+    if bundle_dir not in sys.path:
+        sys.path.insert(0, bundle_dir)
+else:
+    # Development environment: Add project root (parent directory of backend)
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)
+
+# --- YOUR OTHER IMPORTS BELOW THIS LINE ---
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from backend.config import settings
-from backend.ai_engine import ai_engine
 from backend.voice_pipeline import voice_pipeline
-from backend.agent import jarvis_agent
+from backend.clipboard_store import add_clipboard_entry, get_recent_history, search_history
+from backend.agent.router import router as agent_router
+
+import asyncio
+import json
+import time
+import logging
+from typing import List, Dict, Any, Optional
+import psutil
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("MainServer")
@@ -18,7 +37,7 @@ logger = logging.getLogger("MainServer")
 app = FastAPI(
     title=settings.APP_NAME,
     version="1.0.0",
-    description="Hardware AI Companion Backend Server with Real-time Voice, J.A.R.V.I.S. Agent & Touchscreen UI support"
+    description="Hardware AI Companion Backend Server with Real-time Voice & Touchscreen UI support"
 )
 
 # Enable CORS for hardware UI and web clients
@@ -53,27 +72,29 @@ async def root():
         "endpoints": {
             "health": "/api/health",
             "config": "/api/config",
-            "chat": "/api/chat",
+            "agent": "/api/agent/query",
             "stt_live": "/api/stt/live",
             "ws_audio": "/ws/audio",
-            "ws_terminal": "/ws/terminal"
+            "ws_terminal": "/ws/terminal",
+            "clipboard": "/api/clipboard/*"
         }
     }
 
 @app.get("/api/health")
 async def health_check():
-    """System health check including Ollama, J.A.R.V.I.S. agent and audio devices."""
-    ollama_status = await ai_engine.check_health()
+    """System health check including Ollama and audio devices."""
+    # Import here to avoid circular imports
+    from backend.utils.ollama_client import OllamaClient
+
+    ollama = OllamaClient()
+    ollama_status = await ollama.check_health()
+    await ollama.close()
+
     devices = voice_pipeline.get_audio_devices()
     return {
         "system": "OK",
         "timestamp": time.time(),
         "ollama": ollama_status,
-        "agent": {
-            "model": jarvis_agent.model,
-            "tools_count": len(jarvis_agent.tools),
-            "memory_turns": len(jarvis_agent.chat_history) // 2
-        },
         "audio": {
             "devices_count": len(devices),
             "input_index": settings.AUDIO_INPUT_DEVICE_INDEX,
@@ -91,67 +112,75 @@ async def get_config():
         "audio_devices": voice_pipeline.get_audio_devices()
     }
 
-class RenameRequest(BaseModel):
-    name: str
+@app.get("/api/system/telemetry")
+async def get_system_telemetry():
+    """Get system telemetry including CPU, RAM, and disk usage."""
+    try:
+        cpu = psutil.cpu_percent(interval=0.1)
+        mem = psutil.virtual_memory()
+        disk = psutil.disk_usage(os.path.abspath(os.sep))
+        return {
+            "cpu": cpu,
+            "ram": mem.percent,
+            "disk": disk.percent,
+            "timestamp": time.time()
+        }
+    except Exception as e:
+        logger.error(f"Failed to get system telemetry: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/companion")
 async def get_companion():
     """Get active companion metadata."""
     return {
-        "name": jarvis_agent.name,
-        "model": jarvis_agent.model,
-        "memory_turns": len(jarvis_agent.chat_history) // 2
+        "name": settings.COMPANION_NAME,
+        "model": settings.OLLAMA_MODEL,
+        "memory_turns": 0  # No longer tracking memory in this simplified version
     }
 
 @app.post("/api/companion/rename")
-async def rename_companion(req: RenameRequest):
+async def rename_companion(req: ChatRequest):  # Reusing ChatRequest for simplicity
     """Rename the AI companion."""
-    new_name = jarvis_agent.set_name(req.name)
-    return {"status": "success", "name": new_name}
+    # In a real implementation, this would update settings.COMPANION_NAME
+    # For now, we'll just acknowledge the request
+    return {"status": "success", "name": req.prompt}
 
 @app.get("/api/memory")
 async def get_memory():
     """Inspect active conversation memory."""
+    # Simplified - no longer tracking conversation history
     return {
-        "companion_name": jarvis_agent.name,
-        "count": len(jarvis_agent.chat_history),
-        "history": jarvis_agent.get_memory()
+        "companion_name": settings.COMPANION_NAME,
+        "count": 0,
+        "history": []
     }
 
 @app.post("/api/memory/clear")
 async def clear_memory():
     """Clear active conversation memory."""
-    jarvis_agent.clear_memory()
+    # No-op since we're not tracking memory
     return {"status": "memory_cleared"}
-
-class ClipboardAddRequest(BaseModel):
-    content: str
-    category: Optional[str] = None
 
 @app.get("/api/clipboard/history")
 async def get_clipboard_history(limit: int = 15):
     """Get recent clipboard entries from SQLite WAL."""
-    from backend.clipboard_store import get_recent_history
     return {"history": get_recent_history(limit=limit)}
 
 @app.post("/api/clipboard/add")
-async def add_clipboard(req: ClipboardAddRequest):
+async def add_clipboard(content: str = Form(...), category: Optional[str] = Form(None)):
     """Add a snippet to the SQLite WAL clipboard history."""
-    from backend.clipboard_store import add_clipboard_entry
-    result = add_clipboard_entry(req.content, req.category)
+    result = add_clipboard_entry(content, category)
     return result
 
 @app.get("/api/clipboard/search")
 async def search_clipboard(q: str = "", limit: int = 5):
     """Search clipboard history for a query term."""
-    from backend.clipboard_store import search_history
     return {"results": search_history(q, limit=limit)}
 
-@app.post("/api/chat")
-async def chat_endpoint(req: ChatRequest):
-    """AI chat endpoint using J.A.R.V.I.S. agent with local tools & memory."""
-    response_text = await jarvis_agent.ainvoke(req.prompt, req.history)
-    return {"response": response_text}
+# Include the agent router
+app.include_router(agent_router)
+
+# Removed the old /api/chat endpoint - now using /api/agent/query
 
 @app.post("/api/stt")
 async def stt_endpoint(file: UploadFile = File(...)):
@@ -206,7 +235,7 @@ manager = ConnectionManager()
 
 @app.websocket("/api/stt/live")
 async def websocket_stt_live(websocket: WebSocket):
-    """Real-time STT WebSocket endpoint with Faster-Whisper and J.A.R.V.I.S. agent."""
+    """Real-time STT WebSocket endpoint with Faster-Whisper."""
     await manager.connect_audio(websocket)
 
     try:
@@ -225,10 +254,10 @@ async def websocket_stt_live(websocket: WebSocket):
                         "text": transcript
                     })
 
-                    # Stream AI response
+                    # Stream AI response using the new agent endpoint
                     await websocket.send_json({"event": "ai_start"})
                     full_reply = ""
-                    async for token in ai_engine.generate_response_stream(transcript):
+                    async for token in generate_agent_response_stream(transcript):
                         full_reply += token
                         await websocket.send_json({
                             "event": "ai_token",
@@ -246,7 +275,7 @@ async def websocket_stt_live(websocket: WebSocket):
                     prompt = payload.get("prompt", "")
                     await websocket.send_json({"event": "ai_start"})
                     full_reply = ""
-                    async for token in ai_engine.generate_response_stream(prompt, payload.get("history")):
+                    async for token in generate_agent_response_stream(prompt):
                         full_reply += token
                         await websocket.send_json({
                             "event": "ai_token",
@@ -263,6 +292,18 @@ async def websocket_stt_live(websocket: WebSocket):
         logger.error(f"WebSocket live STT error: {e}")
         manager.disconnect_audio(websocket)
 
+async def generate_agent_response_stream(prompt: str):
+    """Generate a streaming response from the agent endpoint."""
+    # Import here to avoid circular imports
+    from backend.utils.ollama_client import OllamaClient
+
+    ollama = OllamaClient()
+    try:
+        async for chunk in ollama.generate_stream(prompt):
+            yield chunk
+    finally:
+        await ollama.close()
+
 @app.websocket("/ws/audio")
 async def websocket_audio_endpoint(websocket: WebSocket):
     """Real-time voice streaming websocket connection."""
@@ -276,7 +317,7 @@ async def websocket_audio_endpoint(websocket: WebSocket):
                 await websocket.send_json({"event": "transcription", "text": transcript})
                 await websocket.send_json({"event": "ai_start"})
                 full_reply = ""
-                async for token in ai_engine.generate_response_stream(transcript):
+                async for token in generate_agent_response_stream(transcript):
                     full_reply += token
                     await websocket.send_json({"event": "ai_token", "token": token})
                 await websocket.send_json({"event": "ai_done", "full_text": full_reply})
@@ -285,7 +326,7 @@ async def websocket_audio_endpoint(websocket: WebSocket):
                 prompt = payload.get("prompt", "")
                 await websocket.send_json({"event": "ai_start"})
                 full_reply = ""
-                async for token in ai_engine.generate_response_stream(prompt, payload.get("history")):
+                async for token in generate_agent_response_stream(prompt):
                     full_reply += token
                     await websocket.send_json({"event": "ai_token", "token": token})
                 await websocket.send_json({"event": "ai_done", "full_text": full_reply})
@@ -303,9 +344,9 @@ async def websocket_terminal_endpoint(websocket: WebSocket):
         "type": "log",
         "level": "SYSTEM",
         "source": "HARDWARE",
-        "message": f"Terminal initialized. J.A.R.V.I.S. Core Online | Model: {settings.OLLAMA_MODEL}"
+        "message": f"Terminal initialized. AURA Backend Online | Model: {settings.OLLAMA_MODEL}"
     })
-    
+
     try:
         while True:
             cmd = await websocket.receive_text()
@@ -320,5 +361,11 @@ async def websocket_terminal_endpoint(websocket: WebSocket):
         manager.disconnect_terminal(websocket)
 
 if __name__ == "__main__":
+    import multiprocessing
+    multiprocessing.freeze_support()
     import uvicorn
-    uvicorn.run("backend.main:app", host=settings.HOST, port=settings.PORT, reload=True)
+
+    if getattr(sys, "frozen", False):
+        uvicorn.run(app, host=settings.HOST, port=settings.PORT, reload=False)
+    else:
+        uvicorn.run("backend.main:app", host=settings.HOST, port=settings.PORT, reload=True)

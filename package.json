@@ -2,56 +2,18 @@
   "name": "ai-companion-device",
   "version": "1.0.0",
   "description": "A complete, production-ready software stack for a local hardware-based AI companion device with real-time voice interaction, code assistance, and a touchscreen dashboard.",
-  "main": "main.js",
   "scripts": {
-    "start": "set NODE_ENV=development&& electron .",
-    "dev": "concurrently \"npm:start-ui\" \"npm:start-backend\" \"wait-on http://localhost:3000 --timeout 60000 && electron .\"",
-    "start-ui": "cd ui && npm run dev",
-    "start-backend": "set OLLAMA_BASE_URL=http://127.0.0.1:11435&& set PYTHONHTTPSVERIFY=0&& set NO_PROXY=localhost,127.0.0.1&& cd backend && ..\\venv\\Scripts\\python.exe -m backend.main"
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "start-ui": "cd ui && npm run dev"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0",
     "concurrently": "^8.2.2",
-    "electron": "^43.2.0",
-    "electron-builder": "^24.13.3",
-    "electron-is-dev": "^3.0.1",
     "wait-on": "^9.1.0"
-  },
-  "build": {
-    "appId": "com.ai-companion.device",
-    "productName": "AI Companion",
-    "directories": {
-      "output": "dist"
-    },
-    "files": [
-      "main.js",
-      "preload.js",
-      "package.json",
-      "backend/**/*",
-      "ui/dist/**/*",
-      "node_modules/**/*",
-      "assets/**/*"
-    ],
-    "win": {
-      "target": [
-        {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
-        }
-      ],
-      "icon": "assets/icon.png"
-    },
-    "mac": {
-      "target": "dmg",
-      "icon": "assets/icon.png"
-    },
-    "linux": {
-      "target": "AppImage",
-      "icon": "assets/icon.png"
-    }
   }
 }
