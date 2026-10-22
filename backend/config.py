@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "Hardware AI Companion"
     COMPANION_NAME: str = "J.A.R.V.I.S."
     DEBUG: bool = True
-    HOST: str = "0.0.0.0"
+    HOST: str = "127.0.0.1"
     PORT: int = 8000
     
     # Audio Settings
