@@ -26,7 +26,7 @@ from pydantic import BaseModel
 
 from backend.config import settings
 from backend.voice_pipeline import STTUnavailableError, voice_pipeline
-from backend.clipboard_store import add_clipboard_entry, get_recent_history, search_history
+from backend.clipboard_store import add_clipboard_entry, get_recent_history, init_db, search_history
 from backend.agent.router import router as agent_router
 from backend.utils.ollama_client import OllamaClient
 
@@ -36,6 +36,8 @@ logger = logging.getLogger("MainServer")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Initialize SQLite database schema
+    init_db()
     # Initialize shared OllamaClient
     app.state.ollama_client = OllamaClient()
     yield
@@ -183,10 +185,15 @@ async def get_clipboard_history(limit: int = 15):
     return {"history": get_recent_history(limit=limit)}
 
 
+class ClipboardAddRequest(BaseModel):
+    content: str
+    category: Optional[str] = None
+
+
 @app.post("/api/clipboard/add")
-async def add_clipboard(content: str = Form(...), category: Optional[str] = Form(None)):
+async def add_clipboard(req: ClipboardAddRequest):
     """Add a snippet to the SQLite WAL clipboard history."""
-    result = add_clipboard_entry(content, category)
+    result = add_clipboard_entry(req.content, req.category)
     return result
 
 

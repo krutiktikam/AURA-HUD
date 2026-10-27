@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+import sys
 from typing import List, Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -7,6 +8,19 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 DEFAULT_CACHE_DIR = str(Path.home() / ".cache" / "huggingface")
 if "HF_HOME" not in os.environ or os.environ["HF_HOME"].startswith("E:"):
     os.environ["HF_HOME"] = DEFAULT_CACHE_DIR
+
+
+def get_default_clipboard_db_path() -> Path:
+    if sys.platform == "win32":
+        local_app_data = os.environ.get("LOCALAPPDATA")
+        base = Path(local_app_data) if local_app_data else Path.home() / "AppData" / "Local"
+    elif sys.platform == "darwin":
+        base = Path.home() / "Library" / "Application Support"
+    else:
+        xdg_data = os.environ.get("XDG_DATA_HOME")
+        base = Path(xdg_data) if xdg_data else Path.home() / ".local" / "share"
+    return base / "AURA HUD" / "clipboard.db"
+
 
 class Settings(BaseSettings):
     """Configuration settings for the AI Companion Device."""
