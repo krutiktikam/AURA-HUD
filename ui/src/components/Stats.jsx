@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE } from '../config';
 
 const Stats = () => {
   const [cpuUsage, setCpuUsage] = useState(0);
@@ -10,7 +11,7 @@ const Stats = () => {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const response = await fetch('http://localhost:8000/api/system/telemetry');
+        const response = await fetch(`${API_BASE}/api/system/telemetry`);
         if (response.ok) {
           const data = await response.json();
           setCpuUsage(data.cpu || 0);
@@ -22,10 +23,6 @@ const Stats = () => {
         }
       } catch (err) {
         setError('Failed to fetch system stats');
-        // Generate mock data for demonstration
-        setCpuUsage(Math.floor(Math.random() * 80));
-        setRamUsage(Math.floor(Math.random() * 90));
-        setDiskUsage(Math.floor(Math.random() * 70));
       } finally {
         setLoading(false);
       }
@@ -49,7 +46,6 @@ const Stats = () => {
     return (
       <div className="p-4 text-center text-red-400">
         <p>{error}</p>
-        <p className="text-xs mt-2">Showing mock data</p>
       </div>
     );
   }
@@ -63,7 +59,8 @@ const Stats = () => {
         </div>
         <div className="w-full bg-white/10 rounded-full h-2.5 overflow-hidden">
           <div
-            className={`h-full bg-lime-400 transition-all duration-500 w-[${cpuUsage}%]`}
+            className="h-full bg-lime-400 transition-all duration-500"
+            style={{ width: `${cpuUsage}%` }}
           ></div>
         </div>
       </div>
@@ -75,7 +72,8 @@ const Stats = () => {
         </div>
         <div className="w-full bg-white/10 rounded-full h-2.5 overflow-hidden">
           <div
-            className={`h-full bg-lime-400 transition-all duration-500 w-[${ramUsage}%]`}
+            className="h-full bg-lime-400 transition-all duration-500"
+            style={{ width: `${ramUsage}%` }}
           ></div>
         </div>
       </div>
@@ -87,7 +85,8 @@ const Stats = () => {
         </div>
         <div className="w-full bg-white/10 rounded-full h-2.5 overflow-hidden">
           <div
-            className={`h-full bg-lime-400 transition-all duration-500 w-[${diskUsage}%]`}
+            className="h-full bg-lime-400 transition-all duration-500"
+            style={{ width: `${diskUsage}%` }}
           ></div>
         </div>
       </div>
