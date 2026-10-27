@@ -1,12 +1,17 @@
-# Python
 __pycache__/
 *.py[cod]
-*$py.class
 venv/
+.venv/
 .env
 *.log
-
-# Node / React
+.pytest_cache/
+.ruff_cache/
 node_modules/
 dist/
+build/
+target/
+src-tauri/bin/
+src-tauri/gen/
+*.exe
+tests/test_report.json
 .DS_Store
