@@ -25,7 +25,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from backend.config import settings
-from backend.voice_pipeline import voice_pipeline
+from backend.voice_pipeline import STTUnavailableError, voice_pipeline
 from backend.clipboard_store import add_clipboard_entry, get_recent_history, search_history
 from backend.agent.router import router as agent_router
 from backend.utils.ollama_client import OllamaClient
@@ -66,10 +66,6 @@ app.add_middleware(
 class ChatRequest(BaseModel):
     prompt: str
     history: Optional[List[Dict[str, str]]] = None
-
-
-class TTSRequest(BaseModel):
-    text: str
 
 
 class ConfigUpdateRequest(BaseModel):
@@ -208,19 +204,11 @@ app.include_router(agent_router)
 async def stt_endpoint(file: UploadFile = File(...)):
     """Convert uploaded audio file to text transcript."""
     content = await file.read()
-    transcript = await voice_pipeline.transcribe_audio_bytes(content)
+    try:
+        transcript = await voice_pipeline.transcribe_audio_bytes(content)
+    except STTUnavailableError as e:
+        raise HTTPException(status_code=503, detail="STT service unavailable") from e
     return {"transcript": transcript}
-
-
-@app.post("/api/tts")
-async def tts_endpoint(req: TTSRequest):
-    """Convert text into audio waveform stream bytes."""
-    audio_bytes = await voice_pipeline.synthesize_tts(req.text)
-    return {
-        "text": req.text,
-        "audio_len": len(audio_bytes),
-        "format": "wav",
-    }
 
 
 # --------------------------------------------------------------------------
@@ -278,7 +266,11 @@ async def websocket_stt_live(websocket: WebSocket):
             if "bytes" in data and data["bytes"]:
                 audio_bytes = data["bytes"]
 
-                transcript = await voice_pipeline.transcribe_stream(audio_bytes)
+                try:
+                    transcript = await voice_pipeline.transcribe_stream(audio_bytes)
+                except STTUnavailableError:
+                    await websocket.send_json({"event": "error", "code": "stt_unavailable"})
+                    continue
 
                 if transcript:
                     await websocket.send_json({

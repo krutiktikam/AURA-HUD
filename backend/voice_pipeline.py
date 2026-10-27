@@ -1,11 +1,14 @@
-import io
-import os
-import wave
 import asyncio
+import importlib.util
+import io
 import logging
+import os
 from pathlib import Path
-from typing import AsyncGenerator, Dict, Any, List, Optional
+from typing import Any, Dict, List, Optional
+
 import numpy as np
+
+from backend.config import settings
 
 # Ensure HF_HOME is safe
 if "HF_HOME" not in os.environ or os.environ["HF_HOME"].startswith("E:"):
@@ -14,6 +17,7 @@ if "HF_HOME" not in os.environ or os.environ["HF_HOME"].startswith("E:"):
 # PyAudio optional import for hardware mic/speaker access
 try:
     import pyaudio
+
     HAS_PYAUDIO = True
 except ImportError:
     HAS_PYAUDIO = False
@@ -21,70 +25,80 @@ except ImportError:
 # faster-whisper import with fallback
 try:
     from faster_whisper import WhisperModel
+
     HAS_FASTER_WHISPER = True
 except ImportError:
     HAS_FASTER_WHISPER = False
 
-# pyttsx3 or TTS engine import with fallback
-try:
-    import pyttsx3
-    HAS_PYTTSX3 = True
-except ImportError:
-    HAS_PYTTSX3 = False
-
-from backend.config import settings
+HAS_PYTTSX3 = importlib.util.find_spec("pyttsx3") is not None
 
 logger = logging.getLogger("VoicePipeline")
 
+
+class STTUnavailableError(Exception):
+    """Raised when Speech-to-Text service is unavailable or fails to initialize."""
+
+    pass
+
+
 class VoicePipeline:
-    """100% Offline Voice interaction pipeline combining STT (Faster-Whisper) and TTS."""
+    """100% Offline Voice interaction pipeline combining STT (Faster-Whisper) and audio devices."""
 
     def __init__(self):
         self.stt_model: Optional[Any] = None
-        self.tts_engine: Optional[Any] = None
-        self._init_stt()
-        self._init_tts()
+        self._stt_lock = asyncio.Lock()
 
-    def _init_tts(self):
-        """Initialize offline TTS engine with female voice (Microsoft Zira)."""
-        if HAS_PYTTSX3:
-            try:
-                self.tts_engine = pyttsx3.init()
-                self.tts_engine.setProperty('rate', settings.TTS_RATE)
-                voices = self.tts_engine.getProperty('voices')
-                for v in voices:
-                    if 'zira' in v.name.lower() or 'female' in getattr(v, 'gender', '').lower():
-                        self.tts_engine.setProperty('voice', v.id)
-                        logger.info(f"Offline TTS voice set to female: {v.name}")
-                        break
-            except Exception as e:
-                logger.warning(f"Could not configure pyttsx3 voice: {e}")
+    async def get_stt_model(self) -> Any:
+        """Lazily load Faster-Whisper model on first use behind an asyncio lock."""
+        if not HAS_FASTER_WHISPER:
+            raise STTUnavailableError("faster-whisper package is not installed")
 
-    def _init_stt(self):
-        """Initialize Faster-Whisper model locally for offline voice transcription."""
-        if HAS_FASTER_WHISPER:
-            try:
-                download_root = getattr(settings, 'WHISPER_DOWNLOAD_ROOT', str(Path.home() / ".cache" / "huggingface" / "hub"))
-                logger.info(f"Loading Faster-Whisper model '{settings.WHISPER_MODEL_SIZE}' on {settings.WHISPER_DEVICE}...")
-                self.stt_model = WhisperModel(
-                    settings.WHISPER_MODEL_SIZE,
-                    device=settings.WHISPER_DEVICE,
-                    compute_type=settings.WHISPER_COMPUTE_TYPE,
-                    download_root=download_root
-                )
-                logger.info("Faster-Whisper model loaded successfully (Offline STT ready).")
-            except Exception as e:
-                logger.warning(f"Could not initialize Faster-Whisper model: {e}. Falling back to dynamic audio mock.")
-                self.stt_model = None
-        else:
-            logger.warning("faster-whisper package not installed. STT will operate in fallback mode.")
+        if self.stt_model is None:
+            async with self._stt_lock:
+                if self.stt_model is None:
+                    try:
+                        loop = asyncio.get_running_loop()
+                        download_root = getattr(
+                            settings,
+                            "WHISPER_DOWNLOAD_ROOT",
+                            str(Path.home() / ".cache" / "huggingface" / "hub"),
+                        )
+                        logger.info(
+                            f"Loading Faster-Whisper model '{settings.WHISPER_MODEL_SIZE}' "
+                            f"on {settings.WHISPER_DEVICE}..."
+                        )
+
+                        def _load_model():
+                            return WhisperModel(
+                                settings.WHISPER_MODEL_SIZE,
+                                device=settings.WHISPER_DEVICE,
+                                compute_type=settings.WHISPER_COMPUTE_TYPE,
+                                download_root=download_root,
+                            )
+
+                        self.stt_model = await loop.run_in_executor(None, _load_model)
+                        logger.info("Faster-Whisper model loaded successfully.")
+                    except Exception as e:
+                        logger.error(f"Could not initialize Faster-Whisper model: {e}")
+                        raise STTUnavailableError(
+                            f"Could not initialize Faster-Whisper model: {e}"
+                        ) from e
+
+        return self.stt_model
 
     def get_audio_devices(self) -> List[Dict[str, Any]]:
         """Query available input and output hardware audio devices."""
         devices = []
         if not HAS_PYAUDIO:
-            return [{"id": 0, "name": "Default Audio Device (PyAudio not installed)", "inputs": 1, "outputs": 2}]
-        
+            return [
+                {
+                    "id": 0,
+                    "name": "Default Audio Device (PyAudio not installed)",
+                    "inputs": 1,
+                    "outputs": 2,
+                }
+            ]
+
         p = pyaudio.PyAudio()
         try:
             for i in range(p.get_device_count()):
@@ -94,7 +108,7 @@ class VoicePipeline:
                     "name": dev.get("name"),
                     "max_input_channels": dev.get("maxInputChannels"),
                     "max_output_channels": dev.get("maxOutputChannels"),
-                    "default_sample_rate": int(dev.get("defaultSampleRate", 16000))
+                    "default_sample_rate": int(dev.get("defaultSampleRate", 16000)),
                 })
         finally:
             p.terminate()
@@ -105,88 +119,63 @@ class VoicePipeline:
         if not audio_data:
             return ""
 
-        if self.stt_model and HAS_FASTER_WHISPER:
-            try:
-                loop = asyncio.get_running_loop()
-                def _do_transcribe():
-                    # Handle raw PCM or WAV
-                    if audio_data.startswith(b'RIFF'):
-                        audio_input = io.BytesIO(audio_data)
-                    else:
-                        audio_input = np.frombuffer(audio_data, dtype=np.int16).astype(np.float32) / 32768.0
+        model = await self.get_stt_model()
+        try:
+            loop = asyncio.get_running_loop()
 
-                    segments, info = self.stt_model.transcribe(
-                        audio_input,
-                        beam_size=5,
-                        language="en"
+            def _do_transcribe():
+                if audio_data.startswith(b"RIFF"):
+                    audio_input = io.BytesIO(audio_data)
+                else:
+                    audio_input = (
+                        np.frombuffer(audio_data, dtype=np.int16).astype(np.float32) / 32768.0
                     )
-                    text = " ".join([segment.text for segment in segments]).strip()
-                    return text
 
-                result = await loop.run_in_executor(None, _do_transcribe)
-                return result if result else ""
-            except Exception as e:
-                logger.error(f"Error transcribing audio with Faster-Whisper: {e}")
-                return ""
-        
-        logger.info("Using STT fallback for raw audio stream processing.")
-        return "System diagnostic check: Please verify device mic input and code status."
+                segments, _ = model.transcribe(
+                    audio_input,
+                    beam_size=5,
+                    language="en",
+                )
+                return " ".join([segment.text for segment in segments]).strip()
+
+            result = await loop.run_in_executor(None, _do_transcribe)
+            return result or ""
+        except Exception as e:
+            logger.error(f"Error transcribing audio with Faster-Whisper: {e}")
+            raise STTUnavailableError(f"Transcription failed: {e}") from e
 
     async def transcribe_stream(self, audio_chunk: bytes) -> str:
         """Stream raw 16kHz 16-bit Mono PCM audio chunks to Faster-Whisper."""
-        if not audio_chunk or not self.stt_model or not HAS_FASTER_WHISPER:
+        if not audio_chunk:
             return ""
 
+        model = await self.get_stt_model()
         try:
             loop = asyncio.get_running_loop()
+
             def _do_stream_transcribe():
-                if audio_chunk.startswith(b'RIFF'):
+                if audio_chunk.startswith(b"RIFF"):
                     audio_input = io.BytesIO(audio_chunk)
                 else:
-                    audio_input = np.frombuffer(audio_chunk, dtype=np.int16).astype(np.float32) / 32768.0
+                    audio_input = (
+                        np.frombuffer(audio_chunk, dtype=np.int16).astype(np.float32) / 32768.0
+                    )
 
-                segments, info = self.stt_model.transcribe(
+                segments, _ = model.transcribe(
                     audio_input,
                     beam_size=5,
                     language="en",
                     vad_filter=True,
-                    vad_parameters=dict(min_silence_duration_ms=400)
+                    vad_parameters=dict(min_silence_duration_ms=400),
                 )
                 text_parts = [seg.text for seg in segments]
                 return " ".join(text_parts).strip()
 
             result = await loop.run_in_executor(None, _do_stream_transcribe)
-            return result if result else ""
+            return result or ""
         except Exception as e:
             logger.error(f"Streaming transcription error: {e}")
-            return ""
+            raise STTUnavailableError(f"Streaming transcription failed: {e}") from e
 
-    def generate_sine_wave_pcm(self, duration_sec: float = 0.5, freq: float = 440.0) -> bytes:
-        """Generate PCM audio stream bytes for TTS streaming / waveform visualizer."""
-        sample_rate = settings.SAMPLE_RATE
-        t = np.linspace(0, duration_sec, int(sample_rate * duration_sec), False)
-        envelope = np.exp(-3 * t)
-        audio = (np.sin(2 * np.pi * freq * t) * envelope * 32767).astype(np.int16)
-        
-        out_buf = io.BytesIO()
-        with wave.open(out_buf, 'wb') as wav_file:
-            wav_file.setnchannels(settings.CHANNELS)
-            wav_file.setsampwidth(2)
-            wav_file.setframerate(sample_rate)
-            wav_file.writeframes(audio.tobytes())
-        return out_buf.getvalue()
-
-    async def synthesize_tts(self, text: str) -> bytes:
-        """Synthesize TTS audio bytes from text response."""
-        if not text:
-            return b""
-        
-        loop = asyncio.get_running_loop()
-        def _generate():
-            num_words = len(text.split())
-            duration = min(max(num_words * 0.15, 0.4), 4.0)
-            return self.generate_sine_wave_pcm(duration_sec=duration, freq=520.0)
-
-        return await loop.run_in_executor(None, _generate)
 
 voice_pipeline = VoicePipeline()
