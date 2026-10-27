@@ -1,5 +1,6 @@
 from enum import Enum
 
+
 class IntentCategory(str, Enum):
     CLIPBOARD_ACTION = "CLIPBOARD_ACTION"
     KNOWLEDGE_QUERY = "KNOWLEDGE_QUERY"

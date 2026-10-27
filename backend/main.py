@@ -1,5 +1,5 @@
-import sys
 import os
+import sys
 
 # --- MUST BE AT THE VERY TOP BEFORE ANY BACKEND IMPORTS ---
 if getattr(sys, 'frozen', False):
@@ -12,23 +12,30 @@ else:
         sys.path.insert(0, project_root)
 
 # --- YOUR OTHER IMPORTS BELOW THIS LINE ---
-from contextlib import asynccontextmanager
-import asyncio
 import json
 import logging
 import time
-from typing import List, Dict, Any, Optional
-import psutil
+from contextlib import asynccontextmanager
+from typing import Any, Dict, List, Optional
 
-from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, UploadFile, File, Form, HTTPException
+import psutil
+from fastapi import (
+    FastAPI,
+    File,
+    HTTPException,
+    Request,
+    UploadFile,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from backend.config import settings
-from backend.voice_pipeline import STTUnavailableError, voice_pipeline
-from backend.clipboard_store import add_clipboard_entry, get_recent_history, init_db, search_history
 from backend.agent.router import router as agent_router
+from backend.clipboard_store import add_clipboard_entry, get_recent_history, init_db, search_history
+from backend.config import settings
 from backend.utils.ollama_client import OllamaClient
+from backend.voice_pipeline import STTUnavailableError, voice_pipeline
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("MainServer")
