@@ -1,7 +1,8 @@
-// Universal Desktop Bridge supporting Tauri v2 + Electron + Browser
+import { API_BASE } from './config';
+
+// Universal Desktop Bridge supporting Tauri v2 + Browser
 export const desktopAPI = {
   isTauri: () => typeof window !== 'undefined' && (Boolean(window.__TAURI_INTERNALS__) || Boolean(window.__TAURI__)),
-  isElectron: () => typeof window !== 'undefined' && Boolean(window.electronAPI),
 
   anchorToCursor: async (width = 380, height = 320) => {
     if (desktopAPI.isTauri()) {
@@ -11,9 +12,6 @@ export const desktopAPI = {
       } catch (err) {
         console.warn('Tauri anchorToCursor error:', err);
       }
-    }
-    if (window.electronAPI?.anchorToCursor) {
-      return await window.electronAPI.anchorToCursor(width, height);
     }
     return { x: 100, y: 100 };
   },
@@ -26,9 +24,6 @@ export const desktopAPI = {
       } catch (err) {
         console.warn('Tauri getClipboardText error:', err);
       }
-    }
-    if (window.electronAPI?.getClipboardText) {
-      return await window.electronAPI.getClipboardText();
     }
     if (navigator.clipboard) {
       try {
@@ -50,9 +45,6 @@ export const desktopAPI = {
         console.warn('Tauri resizeWindow error:', err);
       }
     }
-    if (window.electronAPI?.resizeWindow) {
-      return await window.electronAPI.resizeWindow(width, height);
-    }
   },
 
   getWindowState: async () => {
@@ -63,9 +55,6 @@ export const desktopAPI = {
       } catch (err) {
         console.warn('Tauri getWindowState error:', err);
       }
-    }
-    if (window.electronAPI?.getWindowState) {
-      return await window.electronAPI.getWindowState();
     }
     return 'palette';
   },
@@ -82,25 +71,19 @@ export const desktopAPI = {
         if (unlisten) unlisten();
       };
     }
-    if (window.electronAPI?.onWindowStateChanged) {
-      return window.electronAPI.onWindowStateChanged(callback);
-    }
     return () => {};
   },
 
   onSummonCursor: (callback) => {
-    if (window.electronAPI?.onSummonCursor) {
-      return window.electronAPI.onSummonCursor(callback);
-    }
     return () => {};
   },
 
-  checkBackendHealth: () => fetch('http://localhost:8000/api/health').then((r) => r.json()),
+  checkBackendHealth: () => fetch(`${API_BASE}/api/health`).then((r) => r.json()),
 
   syncClipboardToBackend: async (content, category = null) => {
     if (!content || !content.trim()) return;
     try {
-      await fetch('http://localhost:8000/api/clipboard/add', {
+      await fetch(`${API_BASE}/api/clipboard/add`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: content.trim(), category })
