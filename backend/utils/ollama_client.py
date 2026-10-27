@@ -1,31 +1,32 @@
-import httpx
 import json
 import logging
-from typing import Dict, Any, Optional, AsyncIterator
+from typing import Any, AsyncIterator, Dict, List, Optional
+
+import httpx
 
 from backend.config import settings
 
 logger = logging.getLogger(__name__)
 
+
 class OllamaClient:
-    def __init__(self, base_url: Optional[str] = None):
-        self.base_url = base_url or settings.OLLAMA_BASE_URL
-        self.client = httpx.AsyncClient(timeout=30.0)
+    def __init__(
+        self,
+        base_url: Optional[str] = None,
+        timeout: Optional[float] = None,
+        transport: Optional[httpx.AsyncBaseTransport] = None,
+    ):
+        self.base_url = (base_url or settings.OLLAMA_BASE_URL).rstrip("/")
+        timeout_val = timeout if timeout is not None else settings.API_TIMEOUT_SECONDS
+        self.client = httpx.AsyncClient(timeout=timeout_val, transport=transport)
 
     async def generate(
         self,
         prompt: str,
         format: Optional[str] = None,
-        options: Optional[Dict[str, Any]] = None
+        options: Optional[Dict[str, Any]] = None,
     ) -> str:
-        """
-        Generate a response from Ollama.
-        :param prompt: The input prompt.
-        :param format: The format to use (e.g., "json").
-        :param options: Additional options for the model.
-        :return: The generated text.
-        """
-        payload = {
+        payload: Dict[str, Any] = {
             "model": settings.OLLAMA_MODEL,
             "prompt": prompt,
             "stream": False,
@@ -35,32 +36,21 @@ class OllamaClient:
         if options:
             payload["options"] = options
 
-        try:
-            response = await self.client.post(
-                f"{self.base_url}/api/generate",
-                json=payload
-            )
-            response.raise_for_status()
-            result = response.json()
-            return result.get("response", "")
-        except Exception as e:
-            logger.error(f"Ollama generation failed: {e}")
-            raise
+        response = await self.client.post(
+            f"{self.base_url}/api/generate",
+            json=payload,
+        )
+        response.raise_for_status()
+        result = response.json()
+        return result.get("response", "")
 
     async def generate_stream(
         self,
         prompt: str,
         format: Optional[str] = None,
-        options: Optional[Dict[str, Any]] = None
+        options: Optional[Dict[str, Any]] = None,
     ) -> AsyncIterator[str]:
-        """
-        Generate a streaming response from Ollama.
-        :param prompt: The input prompt.
-        :param format: The format to use (e.g., "json").
-        :param options: Additional options for the model.
-        :yield: Chunks of generated text.
-        """
-        payload = {
+        payload: Dict[str, Any] = {
             "model": settings.OLLAMA_MODEL,
             "prompt": prompt,
             "stream": True,
@@ -70,43 +60,30 @@ class OllamaClient:
         if options:
             payload["options"] = options
 
-        try:
-            async with self.client.stream(
-                "POST",
-                f"{self.base_url}/api/generate",
-                json=payload
-            ) as response:
-                response.raise_for_status()
-                async for chunk in response.aiter_bytes():
-                    if chunk:
-                        # Parse the JSON line and extract the response
-                        try:
-                            line = chunk.decode('utf-8').strip()
-                            if line:
-                                data = json.loads(line)
-                                if "response" in data:
-                                    yield data["response"]
-                        except json.JSONDecodeError:
-                            # Skip invalid JSON lines
-                            continue
-        except Exception as e:
-            logger.error(f"Ollama generation stream failed: {e}")
-            raise
+        async with self.client.stream(
+            "POST",
+            f"{self.base_url}/api/generate",
+            json=payload,
+        ) as response:
+            response.raise_for_status()
+            async for line in response.aiter_lines():
+                clean_line = line.strip()
+                if not clean_line:
+                    continue
+                try:
+                    data = json.loads(clean_line)
+                    if "response" in data:
+                        yield data["response"]
+                except json.JSONDecodeError:
+                    continue
 
     async def chat(
         self,
-        messages: list,
+        messages: List[Dict[str, Any]],
         format: Optional[str] = None,
-        options: Optional[Dict[str, Any]] = None
+        options: Optional[Dict[str, Any]] = None,
     ) -> str:
-        """
-        Chat with Ollama (using the chat endpoint).
-        :param messages: List of message dicts.
-        :param format: The format to use (e.g., "json").
-        :param options: Additional options for the model.
-        :return: The generated text.
-        """
-        payload = {
+        payload: Dict[str, Any] = {
             "model": settings.OLLAMA_MODEL,
             "messages": messages,
             "stream": False,
@@ -116,17 +93,13 @@ class OllamaClient:
         if options:
             payload["options"] = options
 
-        try:
-            response = await self.client.post(
-                f"{self.base_url}/api/chat",
-                json=payload
-            )
-            response.raise_for_status()
-            result = response.json()
-            return result.get("message", {}).get("content", "")
-        except Exception as e:
-            logger.error(f"Ollama chat failed: {e}")
-            raise
+        response = await self.client.post(
+            f"{self.base_url}/api/chat",
+            json=payload,
+        )
+        response.raise_for_status()
+        result = response.json()
+        return result.get("message", {}).get("content", "")
 
     async def health_check(self) -> bool:
         """Check if Ollama is running and the model is available."""
@@ -134,7 +107,6 @@ class OllamaClient:
             response = await self.client.get(f"{self.base_url}/api/tags")
             response.raise_for_status()
             data = response.json()
-            # Check if the model is in the list
             model_names = [m["name"] for m in data.get("models", [])]
             return settings.OLLAMA_MODEL in model_names
         except Exception as e:
