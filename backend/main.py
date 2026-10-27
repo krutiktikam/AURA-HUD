@@ -57,7 +57,9 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.APP_NAME,
     version="1.0.0",
-    description="Hardware AI Companion Backend Server with Real-time Voice & Touchscreen UI support",
+    description=(
+        "Hardware AI Companion Backend Server with Real-time Voice & Touchscreen UI support"
+    ),
     lifespan=lifespan,
 )
 
@@ -150,9 +152,9 @@ async def get_system_telemetry():
             "disk": disk.percent,
             "timestamp": time.time(),
         }
-    except Exception as e:
-        logger.error(f"Failed to get system telemetry: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as err:
+        logger.error(f"Failed to get system telemetry: {err}")
+        raise HTTPException(status_code=500, detail=str(err)) from err
 
 
 @app.get("/api/companion")
@@ -352,7 +354,10 @@ async def websocket_terminal_endpoint(websocket: WebSocket):
                     "type": "telemetry",
                     "level": "METRIC",
                     "source": "HARDWARE",
-                    "message": f"Telemetry OK | Uptime active | Audio sample rate: {settings.SAMPLE_RATE}Hz",
+                    "message": (
+                        "Telemetry OK | Uptime active | "
+                        f"Audio sample rate: {settings.SAMPLE_RATE}Hz"
+                    ),
                 })
     except WebSocketDisconnect:
         manager.disconnect_terminal(websocket)
