@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { API_BASE, WS_BASE } from './config';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Mic,
@@ -170,7 +171,7 @@ export default function App() {
   useEffect(() => {
     refreshClipboard();
 
-    fetch('http://localhost:8000/api/companion')
+    fetch(`${API_BASE}/api/companion`)
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (data?.name) {
@@ -282,7 +283,7 @@ export default function App() {
     setIsThinking(true);
 
     try {
-      const res = await fetch('http://localhost:8000/api/chat', {
+      const res = await fetch(`${API_BASE}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt })
@@ -394,7 +395,7 @@ export default function App() {
       });
       mediaStreamRef.current = stream;
 
-      const ws = new WebSocket('ws://localhost:8000/api/stt/live');
+      const ws = new WebSocket(`${WS_BASE}/api/stt/live`);
       wsRef.current = ws;
 
       ws.onopen = () => {
@@ -445,7 +446,7 @@ export default function App() {
 
   const loadMemory = async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/memory');
+      const res = await fetch(`${API_BASE}/api/memory`);
       if (res.ok) {
         const data = await res.json();
         setMemoryList(data.history || []);
@@ -457,7 +458,7 @@ export default function App() {
 
   const handleClearMemory = async () => {
     try {
-      await fetch('http://localhost:8000/api/memory/clear', { method: 'POST' });
+      await fetch(`${API_BASE}/api/memory/clear`, { method: 'POST' });
       setMemoryList([]);
     } catch (e) {
       console.warn('Clear memory error:', e);
@@ -467,7 +468,7 @@ export default function App() {
   const handleSaveName = async () => {
     if (!nameInput.trim()) return;
     try {
-      const res = await fetch('http://localhost:8000/api/companion/rename', {
+      const res = await fetch(`${API_BASE}/api/companion/rename`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: nameInput.trim() })

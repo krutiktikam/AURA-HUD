@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE } from '../config';
 
 const Clipboard = () => {
   const [history, setHistory] = useState([]);
@@ -9,7 +10,7 @@ const Clipboard = () => {
   useEffect(() => {
     const fetchHistory = async () => {
       try {
-        const response = await fetch(`http://localhost:8000/api/clipboard/history?limit=20`);
+        const response = await fetch(`${API_BASE}/api/clipboard/history?limit=20`);
         if (response.ok) {
           const data = await response.json();
           setHistory(data.history || []);
