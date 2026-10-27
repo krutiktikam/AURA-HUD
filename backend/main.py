@@ -105,7 +105,8 @@ async def health_check(request: Request):
         ollama_status = await temp_client.check_health()
         await temp_client.close()
 
-    devices = voice_pipeline.get_audio_devices()
+    pipeline = getattr(request.app.state, "voice_pipeline", None) or voice_pipeline
+    devices = pipeline.get_audio_devices()
     return {
         "system": "OK",
         "timestamp": time.time(),
@@ -115,7 +116,7 @@ async def health_check(request: Request):
             "input_index": settings.AUDIO_INPUT_DEVICE_INDEX,
             "output_index": settings.AUDIO_OUTPUT_DEVICE_INDEX,
             "sample_rate": settings.SAMPLE_RATE,
-            "stt_loaded": voice_pipeline.stt_model is not None,
+            "stt_loaded": pipeline.stt_model is not None,
         },
     }
 
@@ -208,11 +209,12 @@ app.include_router(agent_router)
 
 
 @app.post("/api/stt")
-async def stt_endpoint(file: UploadFile = File(...)):
+async def stt_endpoint(request: Request, file: UploadFile = File(...)):
     """Convert uploaded audio file to text transcript."""
     content = await file.read()
+    pipeline = getattr(request.app.state, "voice_pipeline", None) or voice_pipeline
     try:
-        transcript = await voice_pipeline.transcribe_audio_bytes(content)
+        transcript = await pipeline.transcribe_audio_bytes(content)
     except STTUnavailableError as e:
         raise HTTPException(status_code=503, detail="STT service unavailable") from e
     return {"transcript": transcript}
@@ -265,6 +267,7 @@ async def websocket_stt_live(websocket: WebSocket):
     """Real-time STT WebSocket endpoint with Faster-Whisper."""
     await manager.connect_audio(websocket)
     ollama: OllamaClient = getattr(websocket.app.state, "ollama_client", None) or OllamaClient()
+    pipeline = getattr(websocket.app.state, "voice_pipeline", None) or voice_pipeline
 
     try:
         while True:
@@ -274,7 +277,7 @@ async def websocket_stt_live(websocket: WebSocket):
                 audio_bytes = data["bytes"]
 
                 try:
-                    transcript = await voice_pipeline.transcribe_stream(audio_bytes)
+                    transcript = await pipeline.transcribe_stream(audio_bytes)
                 except STTUnavailableError:
                     await websocket.send_json({"event": "error", "code": "stt_unavailable"})
                     continue
