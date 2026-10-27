@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { API_BASE, WS_BASE } from './config';
+import { WS_BASE } from './config';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Mic,
@@ -8,10 +8,6 @@ import {
   VolumeX,
   Terminal,
   X,
-  Brain,
-  Edit3,
-  Trash2,
-  Check,
   Copy,
   Code,
   Sparkles,
@@ -115,11 +111,7 @@ function categorizeClipboard(text) {
 
 export default function App() {
   const [viewMode, setViewMode] = useState('wheel');
-  const [companionName, setCompanionName] = useState('AURA');
-  const [isEditingName, setIsEditingName] = useState(false);
-  const [nameInput, setNameInput] = useState('AURA');
-  const [isMemoryOpen, setIsMemoryOpen] = useState(false);
-  const [memoryList, setMemoryList] = useState([]);
+  const companionName = 'AURA';
   const [hoveredNode, setHoveredNode] = useState(null);
   const [activeActionLabel, setActiveActionLabel] = useState('');
 
@@ -170,16 +162,6 @@ export default function App() {
 
   useEffect(() => {
     refreshClipboard();
-
-    fetch(`${API_BASE}/api/companion`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (data?.name) {
-          setCompanionName(data.name);
-          setNameInput(data.name);
-        }
-      })
-      .catch(() => {});
 
     // Listen for summon events (Ctrl+Shift+A / Ctrl+Shift+Space)
     const unSummon = desktopAPI.onSummonCursor(() => {
@@ -235,10 +217,10 @@ export default function App() {
 
   // Auto-scroll chat in dashboard
   useEffect(() => {
-    if (viewMode === 'dashboard' && !isMemoryOpen) {
+    if (viewMode === 'dashboard') {
       chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [messages, isThinking, viewMode, partialText, isMemoryOpen]);
+  }, [messages, isThinking, viewMode, partialText]);
 
   const handleExpandToDashboard = async () => {
     await desktopAPI.resizeWindow(1180, 480);
@@ -248,7 +230,6 @@ export default function App() {
   const handleCollapseToWheel = async () => {
     await desktopAPI.anchorToCursor(620, 580);
     setViewMode('wheel');
-    setIsMemoryOpen(false);
   };
 
   const speakText = (text) => {
@@ -269,7 +250,72 @@ export default function App() {
     }
   };
 
-  const handleSend = async (customPrompt, actionName = 'TASK') => {
+  const speakTextRef = useRef(null);
+  speakTextRef.current = speakText;
+
+  // Persistent live WebSocket for chat streaming & STT audio
+  useEffect(() => {
+    let ws;
+    let isMounted = true;
+    let reconnectTimer = null;
+
+    const connectWs = () => {
+      ws = new WebSocket(`${WS_BASE}/api/stt/live`);
+      wsRef.current = ws;
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.event === 'ai_start') {
+            setIsThinking(false);
+            setStreamResponse('');
+            setMessages((prev) => [...prev, { id: Date.now(), sender: 'companion', text: '' }]);
+          } else if (data.event === 'ai_token' && data.token) {
+            setStreamResponse((prev) => prev + data.token);
+            setMessages((prev) => {
+              const last = prev[prev.length - 1];
+              if (last && last.sender === 'companion') {
+                return [...prev.slice(0, -1), { ...last, text: last.text + data.token }];
+              }
+              return [...prev, { id: Date.now(), sender: 'companion', text: data.token }];
+            });
+          } else if (data.event === 'ai_done') {
+            setIsThinking(false);
+            setCoreStatusMessage('READY');
+            if (data.full_text && speakTextRef.current) {
+              speakTextRef.current(data.full_text);
+            }
+          } else if (data.event === 'transcription' && data.text) {
+            setPartialText(data.text);
+            setMessages((prev) => [...prev, { id: Date.now(), sender: 'user', text: data.text }]);
+          } else if (data.event === 'partial' && data.text) {
+            setPartialText(data.text);
+          } else if (data.event === 'error') {
+            setIsThinking(false);
+            setCoreStatusMessage('READY');
+          }
+        } catch (e) {
+          console.warn('WS message error:', e);
+        }
+      };
+
+      ws.onclose = () => {
+        if (isMounted) {
+          reconnectTimer = setTimeout(connectWs, 2000);
+        }
+      };
+    };
+
+    connectWs();
+
+    return () => {
+      isMounted = false;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (ws) ws.close();
+    };
+  }, []);
+
+  const handleSend = (customPrompt, actionName = 'TASK') => {
     const prompt = customPrompt || inputText;
     if (!prompt.trim() || isThinking) return;
 
@@ -282,30 +328,14 @@ export default function App() {
     setPartialText('');
     setIsThinking(true);
 
-    try {
-      const res = await fetch(`${API_BASE}/api/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt })
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        setIsThinking(false);
-        const reply = data.response || 'Operation completed successfully.';
-        setMessages((prev) => [...prev, { id: Date.now() + 1, sender: 'companion', text: reply }]);
-        setStreamResponse(reply);
-        setCoreStatusMessage('READY');
-        speakText(reply);
-      } else {
-        throw new Error('API Error');
-      }
-    } catch {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'chat', prompt }));
+    } else {
       setIsThinking(false);
       setIsTalking(false);
       setIsSpeakingTTS(false);
       const fallback = `[Standby] ${companionName} offline core active.`;
-      setMessages((prev) => [...prev, { id: Date.now() + 2, sender: 'companion', text: fallback }]);
+      setMessages((prev) => [...prev, { id: Date.now() + 1, sender: 'companion', text: fallback }]);
       setStreamResponse(fallback);
       setCoreStatusMessage('OFFLINE ACTIVE');
       speakText('Local server running.');
@@ -317,14 +347,8 @@ export default function App() {
       toggleVoice();
       return;
     }
-    if (actionId === 'options') {
+    if (actionId === 'options' || actionId === 'memory') {
       handleExpandToDashboard();
-      return;
-    }
-    if (actionId === 'memory') {
-      handleExpandToDashboard();
-      setIsMemoryOpen(true);
-      loadMemory();
       return;
     }
 
@@ -378,7 +402,6 @@ export default function App() {
         mediaStreamRef.current.getTracks().forEach((t) => t.stop());
         mediaStreamRef.current = null;
       }
-      wsRef.current?.close();
       setIsTalking(false);
       setCoreStatusMessage('READY');
       return;
@@ -395,92 +418,33 @@ export default function App() {
       });
       mediaStreamRef.current = stream;
 
-      const ws = new WebSocket(`${WS_BASE}/api/stt/live`);
-      wsRef.current = ws;
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+      audioContextRef.current = audioCtx;
 
-      ws.onopen = () => {
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
-        audioContextRef.current = audioCtx;
+      const source = audioCtx.createMediaStreamSource(stream);
+      const processor = audioCtx.createScriptProcessor(4096, 1, 1);
+      scriptProcessorRef.current = processor;
 
-        const source = audioCtx.createMediaStreamSource(stream);
-        const processor = audioCtx.createScriptProcessor(4096, 1, 1);
-        scriptProcessorRef.current = processor;
-
-        processor.onaudioprocess = (e) => {
-          if (ws.readyState === WebSocket.OPEN) {
-            const inputData = e.inputBuffer.getChannelData(0);
-            const pcm16 = new Int16Array(inputData.length);
-            for (let i = 0; i < inputData.length; i++) {
-              const s = Math.max(-1, Math.min(1, inputData[i]));
-              pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
-            }
-            ws.send(pcm16.buffer);
+      processor.onaudioprocess = (e) => {
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          const inputData = e.inputBuffer.getChannelData(0);
+          const pcm16 = new Int16Array(inputData.length);
+          for (let i = 0; i < inputData.length; i++) {
+            const s = Math.max(-1, Math.min(1, inputData[i]));
+            pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
           }
-        };
-
-        source.connect(processor);
-        processor.connect(audioCtx.destination);
-      };
-
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (data.event === 'transcription' && data.text) {
-            setPartialText(data.text);
-            handleSend(data.text, 'VOICE QUERY');
-          } else if (data.event === 'partial' && data.text) {
-            setPartialText(data.text);
-          }
-        } catch (e) {
-          console.warn('WS message error:', e);
+          wsRef.current.send(pcm16.buffer);
         }
       };
+
+      source.connect(processor);
+      processor.connect(audioCtx.destination);
 
       setIsTalking(true);
       setCoreStatusMessage('LISTENING...');
     } catch (err) {
       console.warn('Direct mic fallback:', err);
       handleSend('Give me a diagnostic status update.', 'STATUS');
-    }
-  };
-
-  const loadMemory = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/api/memory`);
-      if (res.ok) {
-        const data = await res.json();
-        setMemoryList(data.history || []);
-      }
-    } catch {
-      setMemoryList([]);
-    }
-  };
-
-  const handleClearMemory = async () => {
-    try {
-      await fetch(`${API_BASE}/api/memory/clear`, { method: 'POST' });
-      setMemoryList([]);
-    } catch (e) {
-      console.warn('Clear memory error:', e);
-    }
-  };
-
-  const handleSaveName = async () => {
-    if (!nameInput.trim()) return;
-    try {
-      const res = await fetch(`${API_BASE}/api/companion/rename`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: nameInput.trim() })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setCompanionName(data.name);
-        setIsEditingName(false);
-      }
-    } catch {
-      setCompanionName(nameInput.trim());
-      setIsEditingName(false);
     }
   };
 
@@ -822,36 +786,12 @@ export default function App() {
             {/* Header */}
             <header className="h-[46px] px-6 py-2 flex items-center justify-between border-b border-teal-500/15 bg-[#0a1118]/60 backdrop-blur-xl flex-shrink-0 z-10">
               <div className="flex items-center gap-3">
-                {isEditingName ? (
-                  <div className="flex items-center gap-1.5 bg-[#0d1117] border border-teal-400 px-2.5 py-0.5 rounded-lg">
-                    <input
-                      type="text"
-                      className="bg-transparent text-teal-300 font-mono font-bold text-xs outline-none w-24"
-                      value={nameInput}
-                      onChange={(e) => setNameInput(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleSaveName()}
-                      autoFocus
-                    />
-                    <button onClick={handleSaveName} className="text-emerald-400 hover:text-emerald-300">
-                      <Check className="w-3.5 h-3.5" />
-                    </button>
-                    <button onClick={() => setIsEditingName(false)} className="text-rose-400 hover:text-rose-300">
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ) : (
-                  <div
-                    className="flex items-center gap-2 group cursor-pointer"
-                    onClick={() => setIsEditingName(true)}
-                    title="Click to rename companion"
-                  >
-                    <div className="w-2.5 h-2.5 rounded-full bg-teal-400 shadow-[0_0_8px_#2dd4bf] animate-ping" />
-                    <span className="text-teal-300 font-mono font-extrabold tracking-widest text-sm uppercase">
-                      {companionName} LIQUID GLASS HUD
-                    </span>
-                    <Edit3 className="w-3.5 h-3.5 text-slate-400 group-hover:text-teal-300 transition-colors" />
-                  </div>
-                )}
+                <div className="flex items-center gap-2">
+                  <div className="w-2.5 h-2.5 rounded-full bg-teal-400 shadow-[0_0_8px_#2dd4bf] animate-ping" />
+                  <span className="text-teal-300 font-mono font-extrabold tracking-widest text-sm uppercase">
+                    {companionName} LIQUID GLASS HUD
+                  </span>
+                </div>
 
                 <span className="bg-teal-500/10 border border-teal-400/30 text-teal-200 text-[10px] px-2.5 py-0.5 rounded-full font-mono font-semibold tracking-wide">
                   MACOS OPTICS
@@ -859,23 +799,6 @@ export default function App() {
               </div>
 
               <div className="flex items-center gap-3">
-                <button
-                  onClick={() => {
-                    const next = !isMemoryOpen;
-                    setIsMemoryOpen(next);
-                    if (next) loadMemory();
-                  }}
-                  className={`liquid-glass-card flex items-center gap-1.5 px-3 py-1 rounded-lg font-mono text-xs border transition-all cursor-pointer ${
-                    isMemoryOpen
-                      ? 'border-cyan-400 text-cyan-200 shadow-[0_0_12px_rgba(56,189,248,0.35)]'
-                      : 'text-slate-300 hover:text-teal-200 hover:border-teal-400/40'
-                  }`}
-                  title="View / Inspect Working Memory"
-                >
-                  <Brain className="w-3.5 h-3.5 z-10" />
-                  <span className="z-10">MEMORY ({memoryList.length})</span>
-                </button>
-
                 <span className="bg-amber-400/10 border border-amber-400/30 text-amber-300 text-xs px-3 py-1 rounded-lg font-mono font-semibold tracking-wide">
                   {isThinking ? 'PROCESSING' : isTalking ? 'STREAMING 16KHZ' : isSpeakingTTS ? 'TRANSMITTING' : 'STEADY'}
                 </span>
@@ -892,58 +815,6 @@ export default function App() {
 
             {/* Main 3-Column Layout */}
             <main className="grid grid-cols-12 gap-5 p-5 flex-1 min-h-0 relative bg-hud-grid z-10">
-              {/* Working Memory Inspector Drawer */}
-              <AnimatePresence>
-                {isMemoryOpen && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    className="liquid-glass-container absolute inset-x-5 top-5 bottom-5 p-5 z-20 flex flex-col justify-between shadow-2xl font-mono"
-                  >
-                    <div className="flex items-center justify-between border-b border-teal-500/20 pb-3 flex-shrink-0 z-10">
-                      <div className="flex items-center gap-2 text-cyan-300 font-bold text-sm">
-                        <Brain className="w-4 h-4" /> {companionName}'S ACTIVE WORKING MEMORY
-                        <span className="text-xs text-slate-400 font-normal">({memoryList.length} turns)</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <button
-                          onClick={handleClearMemory}
-                          className="flex items-center gap-1.5 text-xs text-rose-300 hover:text-rose-200 border border-rose-500/30 px-3 py-1 rounded-lg cursor-pointer transition-colors"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" /> Clear Buffer
-                        </button>
-                        <button onClick={() => setIsMemoryOpen(false)} className="text-slate-400 hover:text-slate-200">
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="flex-1 overflow-y-auto my-3 pr-2 flex flex-col gap-2.5 text-xs z-10">
-                      {memoryList.length === 0 ? (
-                        <div className="text-slate-500 text-center py-10">Memory buffer is clear.</div>
-                      ) : (
-                        memoryList.map((item, idx) => (
-                          <div
-                            key={idx}
-                            className={`p-3 rounded-xl border ${
-                              item.role === 'user'
-                                ? 'bg-[#131d27]/90 border-amber-500/30 text-amber-200'
-                                : 'bg-[#0f1722]/90 border-cyan-500/30 text-slate-200'
-                            }`}
-                          >
-                            <div className="font-bold text-[10px] text-slate-400 mb-1">
-                              {item.role === 'user' ? '► USER' : `❖ ${companionName.toUpperCase()}`}
-                            </div>
-                            <div className="whitespace-pre-wrap leading-relaxed">{item.content}</div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
               {/* Col 1: Liquid Glass Reactor & Hardware Telemetry */}
               <section className="col-span-3 flex flex-col gap-4">
                 <div className="liquid-glass-card p-4 flex items-center gap-4">
@@ -1066,7 +937,7 @@ export default function App() {
                           <span className="text-teal-300">❖ {companionName.toUpperCase()}</span>
                         )}
                       </div>
-                      {idx === messages.length - 1 && m.sender === 'companion' ? (
+                      {idx === 0 && m.sender === 'companion' ? (
                         <TypewriterText text={m.text} speed={14} />
                       ) : (
                         <span className="whitespace-pre-wrap">{m.text}</span>
