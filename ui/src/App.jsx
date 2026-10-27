@@ -55,8 +55,8 @@ function TypewriterText({ text, speed = 14 }) {
   return <span>{displayedText}</span>;
 }
 
-// Active EQ Meter Component
-function AnimatedEQMeter({ isTalking, isThinking, isSpeaking }) {
+// Activity Indicator Component
+function ActivityIndicator({ isTalking, isThinking, isSpeaking }) {
   const bars = [
     { type: 'mint' }, { type: 'mint' }, { type: 'mint' }, { type: 'mint' },
     { type: 'mint' }, { type: 'mint' }, { type: 'mint' }, { type: 'cyan' },
@@ -64,10 +64,11 @@ function AnimatedEQMeter({ isTalking, isThinking, isSpeaking }) {
     { type: 'pink' }, { type: 'pink' }, { type: 'pink' }, { type: 'pink' }
   ];
 
+  const intensity = (isTalking || isSpeaking) ? 1.0 : isThinking ? 0.6 : 0.25;
+
   return (
     <div className="flex items-end gap-1 h-5 w-full">
       {bars.map((bar, i) => {
-        const activeProbability = isTalking || isSpeaking ? 0.9 : isThinking ? 0.6 : 0.3;
         const colorClass =
           bar.type === 'mint'
             ? 'bg-emerald-300 shadow-[0_0_8px_#6ee7b7]'
@@ -75,13 +76,17 @@ function AnimatedEQMeter({ isTalking, isThinking, isSpeaking }) {
             ? 'bg-cyan-300 shadow-[0_0_8px_#67e8f9]'
             : 'bg-rose-400 shadow-[0_0_8px_#fb7185]';
 
+        const pattern = (((i * 7 + 3) % 11) + 1) / 12;
+        const peakHeight = Math.round(20 + pattern * 75 * intensity);
+        const peakOpacity = Number((0.3 + 0.7 * intensity).toFixed(2));
+
         return (
           <motion.div
             key={i}
             className={`flex-1 rounded-sm ${colorClass}`}
             animate={{
-              height: ['20%', `${Math.floor(Math.random() * 80 + 20)}%`, '30%'],
-              opacity: [0.3, Math.random() < activeProbability ? 1 : 0.25, 0.4]
+              height: ['20%', `${peakHeight}%`, '30%'],
+              opacity: [0.3, peakOpacity, 0.4]
             }}
             transition={{
               duration: 0.4 + (i % 5) * 0.1,
@@ -948,10 +953,10 @@ export default function App() {
                     </div>
                   </div>
                   <div className="flex flex-col font-mono z-10">
-                    <span className="text-xs font-bold text-teal-200 tracking-wider">SPECTRUM 51 dB</span>
+                    <span className="text-xs font-bold text-teal-200 tracking-wider">ACTIVITY INDICATOR</span>
                     <span className="text-[10px] text-emerald-400 font-bold mt-0.5">LIQUID CORE ACTIVE</span>
                     <div className="mt-2 w-full">
-                      <AnimatedEQMeter isTalking={isTalking} isThinking={isThinking} isSpeaking={isSpeakingTTS} />
+                      <ActivityIndicator isTalking={isTalking} isThinking={isThinking} isSpeaking={isSpeakingTTS} />
                     </div>
                   </div>
                 </div>
