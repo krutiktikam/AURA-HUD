@@ -1,7 +1,8 @@
-from enum import Enum
 import json
 import logging
 from typing import Any, Dict, Optional
+
+import httpx
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
@@ -42,72 +43,76 @@ class AgentResponse(BaseModel):
 
 @router.post("/query", response_model=AgentResponse)
 async def query_agent(request: AgentQueryRequest, req: Request):
-    try:
-        # Use shared Ollama client from app state or fallback
-        ollama: OllamaClient = getattr(req.app.state, "ollama_client", None) or OllamaClient()
+    # Retrieve shared client or instantiate fallback
+    ollama: OllamaClient = getattr(req.app.state, "ollama_client", None) or OllamaClient()
 
-        # Prepare the prompt with JSON mode
-        json_schema = {
-            "type": "object",
-            "properties": {
-                "response": {"type": "string"},
-                "intent": {
-                    "type": "string",
-                    "enum": [
-                        "CLIPBOARD_ACTION",
-                        "KNOWLEDGE_QUERY",
-                        "SYSTEM_DIAGNOSTIC",
-                        "GENERAL_CHAT",
-                    ],
-                },
-                "confidence": {"type": "number"},
-                "metadata": {"type": "object"},
+    json_schema = {
+        "type": "object",
+        "properties": {
+            "response": {"type": "string"},
+            "intent": {
+                "type": "string",
+                "enum": [
+                    "CLIPBOARD_ACTION",
+                    "KNOWLEDGE_QUERY",
+                    "SYSTEM_DIAGNOSTIC",
+                    "GENERAL_CHAT",
+                ],
             },
-            "required": ["response", "intent", "confidence"],
-        }
+            "confidence": {"type": "number"},
+            "metadata": {"type": "object"},
+        },
+        "required": ["response", "intent", "confidence"],
+    }
 
-        # Build the system prompt
-        system_prompt = f"""
-        You are an AI assistant for AURA HUD. Analyze the user's request and respond with a structured JSON object.
+    system_prompt = f"""
+    You are an AI assistant for AURA HUD. Analyze the request and respond with JSON.
 
-        Intent Categories:
-        - CLIPBOARD_ACTION: Actions related to clipboard content
-        - KNOWLEDGE_QUERY: Questions about stored knowledge or facts
-        - SYSTEM_DIAGNOSTIC: Requests for system status or diagnostics
-        - GENERAL_CHAT: General conversation or requests
+    Intent Categories:
+    - CLIPBOARD_ACTION: Actions related to clipboard content
+    - KNOWLEDGE_QUERY: Questions about stored knowledge or facts
+    - SYSTEM_DIAGNOSTIC: Requests for system status or diagnostics
+    - GENERAL_CHAT: General conversation or requests
 
-        Respond with a JSON object matching this schema:
-        {json.dumps(json_schema, indent=2)}
-        """
+    Respond with a JSON object matching this schema:
+    {json.dumps(json_schema, indent=2)}
+    """
 
-        full_prompt = f"{system_prompt}\n\nUser Request: {request.prompt}"
+    full_prompt = f"{system_prompt}\n\nUser Request: {request.prompt}"
 
-        response = await ollama.generate(
+    try:
+        raw_response = await ollama.generate(
             prompt=full_prompt,
             format="json",
             options={"temperature": 0.3},
         )
-
-        try:
-            parsed = json.loads(response)
-            return AgentResponse(
-                response=parsed["response"],
-                intent=IntentCategory(parsed["intent"]),
-                confidence=parsed["confidence"],
-                metadata=parsed.get("metadata"),
-            )
-        except (json.JSONDecodeError, KeyError, ValueError) as e:
-            logger.error(f"Failed to parse Ollama response: {e}")
-            raise HTTPException(
-                status_code=500,
-                detail="Failed to parse AI response",
-            )
-
+    except httpx.ConnectError as e:
+        logger.error(f"Failed to connect to AI service: {e}")
+        raise HTTPException(status_code=503, detail="AI service unavailable") from None
+    except httpx.TimeoutException as e:
+        logger.error(f"AI service request timed out: {e}")
+        raise HTTPException(status_code=504, detail="AI service request timed out") from None
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Agent query failed: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=str(e),
+        logger.error(f"AI service error during generate: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error") from None
+
+    try:
+        parsed = json.loads(raw_response)
+        if not isinstance(parsed, dict):
+            raise ValueError("Parsed JSON is not an object")
+        if "response" not in parsed or "intent" not in parsed or "confidence" not in parsed:
+            raise KeyError("Missing required fields in model response")
+        return AgentResponse(
+            response=str(parsed["response"]),
+            intent=IntentCategory(parsed["intent"]),
+            confidence=float(parsed["confidence"]),
+            metadata=parsed.get("metadata"),
         )
+    except (json.JSONDecodeError, KeyError, ValueError, TypeError) as e:
+        logger.error(f"Failed to parse or validate Ollama response: {e}")
+        raise HTTPException(
+            status_code=502,
+            detail="Invalid AI service response",
+        ) from None
