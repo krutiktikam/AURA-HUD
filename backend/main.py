@@ -74,7 +74,6 @@ async def root():
             "config": "/api/config",
             "agent": "/api/agent/query",
             "stt_live": "/api/stt/live",
-            "ws_audio": "/ws/audio",
             "ws_terminal": "/ws/terminal",
             "clipboard": "/api/clipboard/*"
         }
@@ -303,38 +302,6 @@ async def generate_agent_response_stream(prompt: str):
             yield chunk
     finally:
         await ollama.close()
-
-@app.websocket("/ws/audio")
-async def websocket_audio_endpoint(websocket: WebSocket):
-    """Real-time voice streaming websocket connection."""
-    await manager.connect_audio(websocket)
-    try:
-        while True:
-            data = await websocket.receive()
-            if "bytes" in data and data["bytes"]:
-                audio_bytes = data["bytes"]
-                transcript = await voice_pipeline.transcribe_audio_bytes(audio_bytes)
-                await websocket.send_json({"event": "transcription", "text": transcript})
-                await websocket.send_json({"event": "ai_start"})
-                full_reply = ""
-                async for token in generate_agent_response_stream(transcript):
-                    full_reply += token
-                    await websocket.send_json({"event": "ai_token", "token": token})
-                await websocket.send_json({"event": "ai_done", "full_text": full_reply})
-            elif "text" in data and data["text"]:
-                payload = json.loads(data["text"])
-                prompt = payload.get("prompt", "")
-                await websocket.send_json({"event": "ai_start"})
-                full_reply = ""
-                async for token in generate_agent_response_stream(prompt):
-                    full_reply += token
-                    await websocket.send_json({"event": "ai_token", "token": token})
-                await websocket.send_json({"event": "ai_done", "full_text": full_reply})
-    except WebSocketDisconnect:
-        manager.disconnect_audio(websocket)
-    except Exception as e:
-        logger.error(f"WebSocket voice error: {e}")
-        manager.disconnect_audio(websocket)
 
 @app.websocket("/ws/terminal")
 async def websocket_terminal_endpoint(websocket: WebSocket):
