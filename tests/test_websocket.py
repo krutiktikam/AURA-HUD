@@ -71,3 +71,32 @@ def test_websocket_stt_unavailable_returns_error_event(client: TestClient):
         websocket.send_json({"type": "chat", "prompt": "still alive"})
         msg_start = websocket.receive_json()
         assert msg_start == {"event": "ai_start"}
+
+
+def test_websocket_ollama_connect_error_returns_error_event_and_keeps_open(client: TestClient):
+    def connect_error_handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("Failed to connect to Ollama", request=request)
+
+    app.state.ollama_client = OllamaClient(transport=httpx.MockTransport(connect_error_handler))
+
+    with client.websocket_connect("/api/stt/live") as websocket:
+        websocket.send_json({"type": "chat", "prompt": "trigger connect error"})
+
+        err_msg = websocket.receive_json()
+        assert err_msg.get("event") == "error"
+        assert err_msg.get("code") == "ai_service_unavailable"
+
+        # Assert socket is still open by sending a subsequent request with working transport
+        def ok_handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, content=b'{"response": "recovered"}\n')
+
+        app.state.ollama_client = OllamaClient(transport=httpx.MockTransport(ok_handler))
+        websocket.send_json({"type": "chat", "prompt": "are you there?"})
+
+        msg_start = websocket.receive_json()
+        assert msg_start == {"event": "ai_start"}
+        msg_token = websocket.receive_json()
+        assert msg_token == {"event": "ai_token", "token": "recovered"}
+        msg_done = websocket.receive_json()
+        assert msg_done == {"event": "ai_done", "full_text": "recovered"}
+

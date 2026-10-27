@@ -275,12 +275,21 @@ async def generate_agent_response_stream(prompt: str, ollama: OllamaClient):
 async def websocket_stt_live(websocket: WebSocket):
     """Real-time STT WebSocket endpoint with Faster-Whisper."""
     await manager.connect_audio(websocket)
-    ollama: OllamaClient = getattr(websocket.app.state, "ollama_client", None) or OllamaClient()
-    pipeline = getattr(websocket.app.state, "voice_pipeline", None) or voice_pipeline
+    default_ollama = OllamaClient()
 
     try:
         while True:
             data = await websocket.receive()
+            ollama = (
+                getattr(app.state, "ollama_client", None)
+                or getattr(websocket.app.state, "ollama_client", None)
+                or default_ollama
+            )
+            pipeline = (
+                getattr(app.state, "voice_pipeline", None)
+                or getattr(websocket.app.state, "voice_pipeline", None)
+                or voice_pipeline
+            )
 
             if "bytes" in data and data["bytes"]:
                 audio_bytes = data["bytes"]
@@ -297,36 +306,85 @@ async def websocket_stt_live(websocket: WebSocket):
                         "text": transcript,
                     })
 
+                    try:
+                        stream = generate_agent_response_stream(transcript, ollama)
+                        first_token = await anext(stream, None)
+                    except Exception as err:
+                        logger.error(f"AI response stream error: {err}")
+                        await websocket.send_json({
+                            "event": "error",
+                            "code": "ai_service_unavailable",
+                        })
+                        continue
+
                     await websocket.send_json({"event": "ai_start"})
                     full_reply = ""
-                    async for token in generate_agent_response_stream(transcript, ollama):
-                        full_reply += token
+                    if first_token is not None:
+                        full_reply += first_token
                         await websocket.send_json({
                             "event": "ai_token",
-                            "token": token,
+                            "token": first_token,
                         })
 
-                    await websocket.send_json({
-                        "event": "ai_done",
-                        "full_text": full_reply,
-                    })
+                    try:
+                        async for token in stream:
+                            full_reply += token
+                            await websocket.send_json({
+                                "event": "ai_token",
+                                "token": token,
+                            })
+                        await websocket.send_json({
+                            "event": "ai_done",
+                            "full_text": full_reply,
+                        })
+                    except Exception as err:
+                        logger.error(f"AI response stream error: {err}")
+                        await websocket.send_json({
+                            "event": "error",
+                            "code": "ai_service_unavailable",
+                        })
 
             elif "text" in data and data["text"]:
                 payload = json.loads(data["text"])
                 if payload.get("type") == "chat":
                     prompt = payload.get("prompt", "")
+                    try:
+                        stream = generate_agent_response_stream(prompt, ollama)
+                        first_token = await anext(stream, None)
+                    except Exception as err:
+                        logger.error(f"AI response stream error: {err}")
+                        await websocket.send_json({
+                            "event": "error",
+                            "code": "ai_service_unavailable",
+                        })
+                        continue
+
                     await websocket.send_json({"event": "ai_start"})
                     full_reply = ""
-                    async for token in generate_agent_response_stream(prompt, ollama):
-                        full_reply += token
+                    if first_token is not None:
+                        full_reply += first_token
                         await websocket.send_json({
                             "event": "ai_token",
-                            "token": token,
+                            "token": first_token,
                         })
-                    await websocket.send_json({
-                        "event": "ai_done",
-                        "full_text": full_reply,
-                    })
+
+                    try:
+                        async for token in stream:
+                            full_reply += token
+                            await websocket.send_json({
+                                "event": "ai_token",
+                                "token": token,
+                            })
+                        await websocket.send_json({
+                            "event": "ai_done",
+                            "full_text": full_reply,
+                        })
+                    except Exception as err:
+                        logger.error(f"AI response stream error: {err}")
+                        await websocket.send_json({
+                            "event": "error",
+                            "code": "ai_service_unavailable",
+                        })
 
     except WebSocketDisconnect:
         manager.disconnect_audio(websocket)
