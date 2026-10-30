@@ -143,9 +143,9 @@ pub fn run() {
                 .with_handler(|app, _shortcut, event| {
                     if event.state() == ShortcutState::Pressed {
                         if let Some(window) = app.get_webview_window("main") {
-                            let _ = tauri::async_runtime::spawn(async move {
+                            drop(tauri::async_runtime::spawn(async move {
                                 let _ = anchor_to_cursor(window, Some(PALETTE_WIDTH), Some(PALETTE_HEIGHT)).await;
-                            });
+                            }));
                         }
                     }
                 })
@@ -172,9 +172,9 @@ pub fn run() {
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "summon" => {
                         if let Some(window) = app.get_webview_window("main") {
-                            let _ = tauri::async_runtime::spawn(async move {
+                            drop(tauri::async_runtime::spawn(async move {
                                 let _ = anchor_to_cursor(window, Some(PALETTE_WIDTH), Some(PALETTE_HEIGHT)).await;
-                            });
+                            }));
                         }
                     }
                     "toggle" => {
@@ -196,9 +196,9 @@ pub fn run() {
                     if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = event {
                         let app = tray.app_handle();
                         if let Some(window) = app.get_webview_window("main") {
-                            let _ = tauri::async_runtime::spawn(async move {
+                            drop(tauri::async_runtime::spawn(async move {
                                 let _ = anchor_to_cursor(window, Some(PALETTE_WIDTH), Some(PALETTE_HEIGHT)).await;
-                            });
+                            }));
                         }
                     }
                 })
@@ -213,16 +213,15 @@ pub fn run() {
             }
 
             // Initialize the sidecar backend
-            let _ = spawn_backend(handle);
+            drop(spawn_backend(handle));
 
             Ok(())
         })
-        .on_window_event(|window, event| match event {
-            tauri::WindowEvent::CloseRequested { api, .. } => {
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 api.prevent_close();
                 let _ = window.hide();
             }
-            _ => {}
         })
         .invoke_handler(tauri::generate_handler![
             anchor_to_cursor,
