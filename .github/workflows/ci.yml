@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    name: Python
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Run lint and tests
+        env:
+          CLIPBOARD_DB_PATH: ${{ runner.temp }}/clipboard_test.db
+        run: |
+          ruff check .
+          pytest -q
+
+  ui:
+    name: UI
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '25'
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      - name: Install and build UI
+        working-directory: ui
+        run: |
+          npm ci
+          npm run build
+
+      - name: Upload UI build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-dist
+          path: ui/dist
+
+  rust:
+    name: Rust
+    runs-on: windows-latest
+    needs: ui
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download UI build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ui-dist
+          path: ui/dist
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Cache cargo dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Create sidecar binary placeholder
+        # tauri-build validates externalBin binaries declared in tauri.conf.json at build/check time.
+        # A 0-byte placeholder satisfies tauri-build without compiling the full PyInstaller backend in CI.
+        run: |
+          New-Item -ItemType Directory -Force -Path src-tauri/bin
+          New-Item -ItemType File -Force -Path src-tauri/bin/aura-backend-x86_64-pc-windows-msvc.exe
+
+      - name: Run Clippy
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
+
+      - name: Run Tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml
