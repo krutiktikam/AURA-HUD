@@ -1,3 +1,4 @@
+![CI](https://github.com/krutiktikam/AURA-HUD/actions/workflows/ci.yml/badge.svg)
 # ⚡ AURA HUD — Cursor-Anchored AI Desktop Companion & Productivity Engine
 
 > **A modern, 100% private and offline AI HUD built with Tauri v2 (Rust), React 18, Tailwind CSS v4, FastAPI, LangChain, and SQLite WAL.**  
