@@ -46,7 +46,7 @@ pub fn spawn_backend(app_handle: &tauri::AppHandle) -> tauri::async_runtime::Joi
                     if let Some(stdout) = stdout {
                         tauri::async_runtime::spawn(async move {
                             let reader = BufReader::new(stdout);
-                            for line in reader.lines().flatten() {
+                            for line in reader.lines().map_while(Result::ok) {
                                 info!("[backend] {}", line);
                                 let _ = app_h.emit("backend-log", &line);
                             }
@@ -58,7 +58,7 @@ pub fn spawn_backend(app_handle: &tauri::AppHandle) -> tauri::async_runtime::Joi
                     if let Some(stderr) = stderr {
                         tauri::async_runtime::spawn(async move {
                             let reader = BufReader::new(stderr);
-                            for line in reader.lines().flatten() {
+                            for line in reader.lines().map_while(Result::ok) {
                                 error!("[backend-err] {}", line);
                                 let _ = app_err_h.emit("backend-error", &line);
                             }
