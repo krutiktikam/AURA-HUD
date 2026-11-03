@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -10,6 +11,8 @@ from backend.config import settings
 from backend.main import app
 from backend.utils.ollama_client import OllamaClient
 from backend.voice_pipeline import STTUnavailableError
+
+TEST_API_TOKEN = "test_aura_secret_token_at_least_32_chars_long"
 
 
 class FakeVoicePipeline:
@@ -32,6 +35,22 @@ class FakeVoicePipeline:
         return [{"id": 0, "name": "Fake Device", "inputs": 1, "outputs": 2}]
 
 
+class AuthenticatedTestClient(TestClient):
+    @contextmanager
+    def websocket_connect(self, url, *args, auto_auth=True, **kwargs):
+        if not url.startswith(("ws://", "wss://", "http://", "https://")):
+            url = f"ws://127.0.0.1{url if url.startswith('/') else '/' + url}"
+        with super().websocket_connect(url, *args, **kwargs) as ws:
+            if auto_auth:
+                ws.send_json({"type": "auth", "token": TEST_API_TOKEN})
+            yield ws
+
+
+@pytest.fixture
+def test_token() -> str:
+    return TEST_API_TOKEN
+
+
 @pytest.fixture
 def temp_db(tmp_path: Path):
     db_file = tmp_path / "test_clipboard.db"
@@ -47,7 +66,10 @@ def fake_stt() -> FakeVoicePipeline:
 
 
 @pytest.fixture
-def client(temp_db: Path, fake_stt: FakeVoicePipeline):
+def client(temp_db: Path, fake_stt: FakeVoicePipeline, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("AURA_API_TOKEN", TEST_API_TOKEN)
+    app.state.api_token = TEST_API_TOKEN
+
     # Default transport returning valid health and empty tags
     def default_handler(request: httpx.Request) -> httpx.Response:
         if request.url.path == "/api/tags":
@@ -58,5 +80,9 @@ def client(temp_db: Path, fake_stt: FakeVoicePipeline):
     app.state.ollama_client = mock_client
     app.state.voice_pipeline = fake_stt
 
-    with TestClient(app) as test_client:
+    with AuthenticatedTestClient(
+        app,
+        base_url="http://127.0.0.1",
+        headers={"Authorization": f"Bearer {TEST_API_TOKEN}"},
+    ) as test_client:
         yield test_client

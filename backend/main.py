@@ -20,6 +20,7 @@ from typing import List, Optional
 
 import psutil
 from fastapi import (
+    Depends,
     FastAPI,
     HTTPException,
     Request,
@@ -27,11 +28,18 @@ from fastapi import (
     WebSocketDisconnect,
 )
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from pydantic import BaseModel
 
 from backend.agent.router import router as agent_router
 from backend.clipboard_store import add_clipboard_entry, get_recent_history, init_db, search_history
 from backend.config import settings
+from backend.security import (
+    authenticate_websocket,
+    get_allowed_origins,
+    load_api_token,
+    require_token,
+)
 from backend.utils.ollama_client import OllamaClient
 from backend.voice_pipeline import STTUnavailableError, voice_pipeline
 
@@ -41,6 +49,8 @@ logger = logging.getLogger("MainServer")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Initialize API token (fails closed if missing or < 32 characters)
+    app.state.api_token = load_api_token()
     # Initialize SQLite database schema
     init_db()
     # Initialize shared OllamaClient
@@ -67,14 +77,18 @@ app = FastAPI(
 # Enable CORS for hardware UI and web clients
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=list(get_allowed_origins()),
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
+)
+app.add_middleware(
+    TrustedHostMiddleware,
+    allowed_hosts=["127.0.0.1", "localhost"],
 )
 
 
-@app.get("/api/health")
+@app.get("/api/health", dependencies=[Depends(require_token)])
 async def health_check(request: Request):
     """System health check including Ollama and audio devices."""
     ollama: Optional[OllamaClient] = getattr(request.app.state, "ollama_client", None)
@@ -101,7 +115,7 @@ async def health_check(request: Request):
     }
 
 
-@app.get("/api/system/telemetry")
+@app.get("/api/system/telemetry", dependencies=[Depends(require_token)])
 async def get_system_telemetry():
     """Get system telemetry including CPU, RAM, and disk usage."""
     try:
@@ -119,7 +133,7 @@ async def get_system_telemetry():
         raise HTTPException(status_code=500, detail=str(err)) from err
 
 
-@app.get("/api/clipboard/history")
+@app.get("/api/clipboard/history", dependencies=[Depends(require_token)])
 async def get_clipboard_history(limit: int = 15):
     """Get recent clipboard entries from SQLite WAL."""
     return {"history": get_recent_history(limit=limit)}
@@ -130,21 +144,21 @@ class ClipboardAddRequest(BaseModel):
     category: Optional[str] = None
 
 
-@app.post("/api/clipboard/add")
+@app.post("/api/clipboard/add", dependencies=[Depends(require_token)])
 async def add_clipboard(req: ClipboardAddRequest):
     """Add a snippet to the SQLite WAL clipboard history."""
     result = add_clipboard_entry(req.content, req.category)
     return result
 
 
-@app.get("/api/clipboard/search")
+@app.get("/api/clipboard/search", dependencies=[Depends(require_token)])
 async def search_clipboard(q: str = "", limit: int = 5):
     """Search clipboard history for a query term."""
     return {"results": search_history(q, limit=limit)}
 
 
 # Include the agent router
-app.include_router(agent_router)
+app.include_router(agent_router, dependencies=[Depends(require_token)])
 
 
 # --------------------------------------------------------------------------
@@ -156,7 +170,6 @@ class ConnectionManager:
         self.active_audio_sockets: List[WebSocket] = []
 
     async def connect_audio(self, websocket: WebSocket):
-        await websocket.accept()
         self.active_audio_sockets.append(websocket)
 
     def disconnect_audio(self, websocket: WebSocket):
@@ -176,6 +189,8 @@ async def generate_agent_response_stream(prompt: str, ollama: OllamaClient):
 @app.websocket("/api/stt/live")
 async def websocket_stt_live(websocket: WebSocket):
     """Real-time STT WebSocket endpoint with Faster-Whisper."""
+    if not await authenticate_websocket(websocket):
+        return
     await manager.connect_audio(websocket)
     default_ollama = OllamaClient()
 
