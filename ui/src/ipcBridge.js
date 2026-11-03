@@ -1,3 +1,4 @@
+import { apiFetch } from './api';
 import { API_BASE } from './config';
 
 // Universal Desktop Bridge supporting Tauri v2 + Browser
@@ -78,12 +79,12 @@ export const desktopAPI = {
     return () => {};
   },
 
-  checkBackendHealth: () => fetch(`${API_BASE}/api/health`).then((r) => r.json()),
+  checkBackendHealth: () => apiFetch(`${API_BASE}/api/health`).then((r) => r.json()),
 
   syncClipboardToBackend: async (content, category = null) => {
     if (!content || !content.trim()) return;
     try {
-      await fetch(`${API_BASE}/api/clipboard/add`, {
+      await apiFetch(`${API_BASE}/api/clipboard/add`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: content.trim(), category })

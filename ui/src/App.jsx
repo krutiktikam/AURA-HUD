@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { WS_BASE } from './config';
+import { getToken } from './api';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Mic,
@@ -259,9 +260,26 @@ export default function App() {
     let isMounted = true;
     let reconnectTimer = null;
 
-    const connectWs = () => {
+    const connectWs = async () => {
+      let token;
+      try {
+        token = await getToken();
+      } catch (err) {
+        console.warn('Failed to obtain API token for WebSocket:', err);
+        if (isMounted) {
+          setCoreStatusMessage('AUTH_ERROR');
+        }
+        return;
+      }
+
+      if (!isMounted) return;
+
       ws = new WebSocket(`${WS_BASE}/api/stt/live`);
       wsRef.current = ws;
+
+      ws.onopen = () => {
+        ws.send(JSON.stringify({ type: 'auth', token }));
+      };
 
       ws.onmessage = (event) => {
         try {
@@ -299,7 +317,14 @@ export default function App() {
         }
       };
 
-      ws.onclose = () => {
+      ws.onclose = (event) => {
+        if (event.code === 4401 || event.code === 1008) {
+          if (isMounted) {
+            setCoreStatusMessage('AUTH_ERROR');
+            setIsThinking(false);
+          }
+          return;
+        }
         if (isMounted) {
           reconnectTimer = setTimeout(connectWs, 2000);
         }

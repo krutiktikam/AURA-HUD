@@ -3,15 +3,20 @@ import logging
 from typing import Any, Dict, Optional
 
 import httpx
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from backend.models.intent import IntentCategory
+from backend.security import require_token
 from backend.utils.ollama_client import OllamaClient
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/agent", tags=["Agent"])
+router = APIRouter(
+    prefix="/api/agent",
+    tags=["Agent"],
+    dependencies=[Depends(require_token)],
+)
 
 
 class AgentQueryRequest(BaseModel):

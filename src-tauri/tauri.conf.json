@@ -33,7 +33,8 @@
       "tooltip": "AURA HUD - AI Desktop Companion"
     },
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost http://127.0.0.1:8000 ws://127.0.0.1:8000",
+      "devCsp": "default-src 'self' http://localhost:3000; script-src 'self' http://localhost:3000; style-src 'self' 'unsafe-inline' http://localhost:3000; img-src 'self' data: http://localhost:3000; connect-src 'self' ipc: http://ipc.localhost http://127.0.0.1:8000 ws://127.0.0.1:8000 ws://localhost:3000 http://localhost:3000"
     }
   },
   "bundle": {

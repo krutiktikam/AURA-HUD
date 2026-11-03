@@ -13,6 +13,8 @@ use serde::{Deserialize, Serialize};
 use arboard::Clipboard;
 use sidecar::spawn_backend;
 
+pub struct ApiToken(pub String);
+
 #[derive(Serialize, Deserialize, Clone)]
 pub struct CursorPosition {
     pub x: f64,
@@ -29,6 +31,23 @@ pub const PALETTE_WIDTH: f64 = 620.0;
 pub const PALETTE_HEIGHT: f64 = 580.0;
 pub const EXPANDED_WIDTH: f64 = 1180.0;
 pub const EXPANDED_HEIGHT: f64 = 480.0;
+
+pub fn generate_token() -> String {
+    let mut bytes = [0u8; 32];
+    getrandom::fill(&mut bytes).expect("failed to generate random bytes for API token");
+    const HEX_CHARS: &[u8; 16] = b"0123456789abcdef";
+    let mut hex = String::with_capacity(64);
+    for &b in &bytes {
+        hex.push(HEX_CHARS[(b >> 4) as usize] as char);
+        hex.push(HEX_CHARS[(b & 0xf) as usize] as char);
+    }
+    hex
+}
+
+#[tauri::command]
+fn get_api_token(token: tauri::State<'_, ApiToken>) -> String {
+    token.0.clone()
+}
 
 /// Snaps the HUD directly beside the OS cursor with multi-monitor edge protection
 #[tauri::command]
@@ -152,6 +171,9 @@ pub fn run() {
                 .build()
         )
         .setup(|app| {
+            let token = generate_token();
+            app.manage(ApiToken(token.clone()));
+
             let handle = app.handle();
 
             // Setup tray menu
@@ -213,7 +235,7 @@ pub fn run() {
             }
 
             // Initialize the sidecar backend
-            drop(spawn_backend(handle));
+            drop(spawn_backend(handle, &token));
 
             Ok(())
         })
@@ -228,8 +250,33 @@ pub fn run() {
             get_clipboard_text,
             resize_window,
             get_window_state,
-            sidecar::ping_backend
+            sidecar::ping_backend,
+            get_api_token
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_generate_token_length() {
+        let token = generate_token();
+        assert_eq!(token.len(), 64);
+    }
+
+    #[test]
+    fn test_generate_token_charset() {
+        let token = generate_token();
+        assert!(token.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn test_generate_token_uniqueness() {
+        let token1 = generate_token();
+        let token2 = generate_token();
+        assert_ne!(token1, token2);
+    }
 }

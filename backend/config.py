@@ -58,7 +58,11 @@ class Settings(BaseSettings):
     CLIPBOARD_DB_PATH: Optional[str] = None
 
     # API & WebSocket Settings
-    CORS_ORIGINS: List[str] = ["*"]
+    CORS_ORIGINS: List[str] = [
+        "http://tauri.localhost",
+        "https://tauri.localhost",
+        "http://localhost:3000",
+    ]
     API_TIMEOUT_SECONDS: float = 30.0
     
     model_config = SettingsConfigDict(

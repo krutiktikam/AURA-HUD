@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE } from '../config';
+import { apiFetch } from '../api';
 
 const Stats = () => {
   const [cpuUsage, setCpuUsage] = useState(0);
@@ -11,7 +12,7 @@ const Stats = () => {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const response = await fetch(`${API_BASE}/api/system/telemetry`);
+        const response = await apiFetch(`${API_BASE}/api/system/telemetry`);
         if (response.ok) {
           const data = await response.json();
           setCpuUsage(data.cpu || 0);

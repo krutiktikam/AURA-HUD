@@ -4,17 +4,6 @@
   "description": "enables the default permissions",
   "windows": ["main"],
   "permissions": [
-    "core:default",
-    "core:app:default",
-    "core:window:default",
-    "core:window:allow-hide",
-    "core:window:allow-show",
-    "core:window:allow-set-focus",
-    "core:window:allow-is-visible",
-    "core:window:allow-set-size",
-    "core:window:allow-set-position",
-    "core:window:allow-current-monitor",
-    "core:tray:default",
-    "global-shortcut:default"
+    "core:default"
   ]
 }

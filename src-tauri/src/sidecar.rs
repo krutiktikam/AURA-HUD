@@ -6,8 +6,9 @@ use std::process::{Command, Stdio};
 use std::io::{BufRead, BufReader};
 
 /// Spawns the backend executable as a sidecar process or local python
-pub fn spawn_backend(app_handle: &tauri::AppHandle) -> tauri::async_runtime::JoinHandle<()> {
+pub fn spawn_backend(app_handle: &tauri::AppHandle, token: &str) -> tauri::async_runtime::JoinHandle<()> {
     let app_handle_clone = app_handle.clone();
+    let token = token.to_string();
 
     tauri::async_runtime::spawn(async move {
         // Check for local virtual environment python
@@ -28,6 +29,7 @@ pub fn spawn_backend(app_handle: &tauri::AppHandle) -> tauri::async_runtime::Joi
             info!("Starting backend via Python venv: {:?}", py);
             let mut cmd = Command::new(&py);
             cmd.arg("backend/main.py")
+               .env("AURA_API_TOKEN", &token)
                .stdout(Stdio::piped())
                .stderr(Stdio::piped());
 
@@ -80,7 +82,7 @@ pub fn spawn_backend(app_handle: &tauri::AppHandle) -> tauri::async_runtime::Joi
         info!("Starting backend sidecar: aura-backend");
 
         let sidecar_command = match app_handle_clone.shell().sidecar("aura-backend") {
-            Ok(cmd) => cmd,
+            Ok(cmd) => cmd.env("AURA_API_TOKEN", &token),
             Err(e) => {
                 error!("Failed to configure backend sidecar: {}", e);
                 return;
