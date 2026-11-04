@@ -14,11 +14,16 @@ class OllamaClient:
         self,
         base_url: Optional[str] = None,
         timeout: Optional[float] = None,
+        connect_timeout: Optional[float] = None,
+        read_timeout: Optional[float] = None,
         transport: Optional[httpx.AsyncBaseTransport] = None,
     ):
         self.base_url = (base_url or settings.OLLAMA_BASE_URL).rstrip("/")
-        timeout_val = timeout if timeout is not None else settings.API_TIMEOUT_SECONDS
-        self.client = httpx.AsyncClient(timeout=timeout_val, transport=transport)
+        # Timeout and retry values are starting defaults, not tuned
+        c_timeout = connect_timeout or timeout or settings.OLLAMA_CONNECT_TIMEOUT
+        r_timeout = read_timeout or timeout or settings.OLLAMA_READ_TIMEOUT
+        client_timeout = httpx.Timeout(connect=c_timeout, read=r_timeout, write=10.0, pool=5.0)
+        self.client = httpx.AsyncClient(timeout=client_timeout, transport=transport)
 
     async def generate(
         self,

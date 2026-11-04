@@ -49,6 +49,12 @@ class Settings(BaseSettings):
     # LLM Settings (Ollama - 100% Offline Local Model)
     OLLAMA_BASE_URL: str = "http://127.0.0.1:11434"
     OLLAMA_MODEL: str = "llama3.2:1b"
+    # Timeout and retry values are starting defaults, not tuned
+    OLLAMA_CONNECT_TIMEOUT: float = 2.0
+    OLLAMA_READ_TIMEOUT: float = 60.0
+    OLLAMA_HEALTH_TIMEOUT: float = 2.0
+    OLLAMA_MAX_RETRIES: int = 2
+    OLLAMA_RETRY_BACKOFF: float = 0.25
     
     # Text-to-Speech (TTS) Settings
     TTS_ENGINE: str = "system"  # 'system', 'pyttsx3', or 'mock'
@@ -63,7 +69,7 @@ class Settings(BaseSettings):
         "https://tauri.localhost",
         "http://localhost:3000",
     ]
-    API_TIMEOUT_SECONDS: float = 30.0
+
     
     model_config = SettingsConfigDict(
         env_file=".env",
