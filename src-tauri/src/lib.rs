@@ -6,6 +6,7 @@
 mod sidecar;
 #[cfg(windows)]
 mod job;
+pub mod supervisor;
 
 use tauri::Manager;
 use tauri::tray::{TrayIconBuilder, TrayIconEvent, MouseButton, MouseButtonState};
