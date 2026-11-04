@@ -37,6 +37,19 @@ def init_db(db_path: Optional[Path] = None) -> None:
             )
 
 
+def db_ok(db_path: Optional[Path] = None) -> bool:
+    """Check database health by running SELECT 1 without logging content."""
+    try:
+        path = db_path or get_db_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with closing(sqlite3.connect(path)) as conn:
+            cursor = conn.execute("SELECT 1;")
+            row = cursor.fetchone()
+            return row is not None and row[0] == 1
+    except Exception:
+        return False
+
+
 def detect_category(content: str) -> str:
     """Classify clipboard content into code, json, url, or text."""
     s = content.strip()

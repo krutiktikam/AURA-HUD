@@ -20,6 +20,7 @@ class FakeVoicePipeline:
         self.available = available
         self.transcript = transcript
         self.stt_model = object() if available else None
+        self.stt_state = "ready" if available else "failed"
 
     async def transcribe_audio_bytes(self, audio_data: bytes, format: str = "wav") -> str:
         if not self.available:
