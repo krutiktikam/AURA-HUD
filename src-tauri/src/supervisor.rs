@@ -228,24 +228,28 @@ fn find_workspace_root() -> std::io::Result<std::path::PathBuf> {
 fn resolve_backend_command(token: &str) -> std::io::Result<Command> {
     let root_dir = find_workspace_root()?;
 
-    let venv_python = root_dir.join("venv").join("Scripts").join("python.exe");
-    let py = if venv_python.exists() {
-        venv_python
-    } else {
-        let fallback_candidates = [
-            std::path::PathBuf::from("venv/Scripts/python.exe"),
-            std::path::PathBuf::from("../venv/Scripts/python.exe"),
-        ];
-        fallback_candidates
-            .into_iter()
-            .find(|p| p.exists())
-            .ok_or_else(|| {
-                std::io::Error::new(
-                    std::io::ErrorKind::NotFound,
-                    "Python virtual environment not found in venv/Scripts/python.exe or ../venv/Scripts/python.exe",
-                )
-            })?
-    };
+    let candidates = [
+        root_dir.join("venv").join("Scripts").join("python.exe"),
+        root_dir.join("venv").join("bin").join("python"),
+        std::path::PathBuf::from("venv/Scripts/python.exe"),
+        std::path::PathBuf::from("../venv/Scripts/python.exe"),
+        std::path::PathBuf::from("venv/bin/python"),
+        std::path::PathBuf::from("../venv/bin/python"),
+    ];
+
+    let py = candidates
+        .into_iter()
+        .find(|p| p.exists())
+        .unwrap_or_else(|| {
+            #[cfg(windows)]
+            {
+                std::path::PathBuf::from("python")
+            }
+            #[cfg(not(windows))]
+            {
+                std::path::PathBuf::from("python3")
+            }
+        });
 
     let mut cmd = Command::new(py);
     cmd.args(["-m", "backend.main"])
