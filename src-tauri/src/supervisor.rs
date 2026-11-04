@@ -1,6 +1,15 @@
+use serde::Serialize;
 use std::io::{BufRead, BufReader, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
+use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::{Arc, Mutex};
+use std::thread;
 use std::time::{Duration, Instant};
+use tauri::Emitter;
+
+/// Default port for the backend server.
+pub const BACKEND_PORT: u16 = 8000;
 
 /// Calculates backoff delay based on retry attempt.
 /// Timing constants are starting defaults (not tuned): 1s, 2s, 4s, 8s, 16s, then 30s cap.
@@ -138,6 +147,359 @@ pub fn http_health_ok(port: u16, token: &str, timeout: Duration) -> bool {
     parts.len() >= 2 && parts[1] == "200"
 }
 
+/// Kill a process tree by PID using taskkill on Windows.
+pub fn kill_process_tree(pid: u32) {
+    if pid == 0 {
+        return;
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        let _ = Command::new("taskkill")
+            .args(["/PID", &pid.to_string(), "/T", "/F"])
+            .creation_flags(CREATE_NO_WINDOW)
+            .output();
+    }
+}
+
+#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+pub struct BackendStatusPayload {
+    pub state: String,
+    pub attempt: u32,
+}
+
+fn emit_status(app_handle: &tauri::AppHandle, state: &str, attempt: u32) {
+    let payload = BackendStatusPayload {
+        state: state.to_string(),
+        attempt,
+    };
+    let _ = app_handle.emit("backend-status", payload);
+}
+
+fn sleep_with_stop_flag(duration: Duration, stop_flag: &AtomicBool) {
+    let start = Instant::now();
+    while start.elapsed() < duration && !stop_flag.load(Ordering::SeqCst) {
+        let remaining = duration.saturating_sub(start.elapsed());
+        thread::sleep(remaining.min(Duration::from_millis(100)));
+    }
+}
+
+#[cfg(debug_assertions)]
+fn resolve_backend_command(token: &str) -> std::io::Result<Command> {
+    let candidates = [
+        std::path::PathBuf::from("venv/Scripts/python.exe"),
+        std::path::PathBuf::from("../venv/Scripts/python.exe"),
+    ];
+
+    let mut python_path = None;
+    for candidate in &candidates {
+        if candidate.exists() {
+            python_path = Some(candidate.clone());
+            break;
+        }
+    }
+
+    let py = python_path.ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "Python virtual environment not found in venv/Scripts/python.exe or ../venv/Scripts/python.exe",
+        )
+    })?;
+
+    let mut cmd = Command::new(py);
+    cmd.args(["-m", "backend.main"])
+        .env("AURA_API_TOKEN", token)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    if std::path::Path::new("backend").exists() {
+        // Current directory is repo root
+    } else if std::path::Path::new("../backend").exists() {
+        cmd.current_dir("..");
+    }
+
+    Ok(cmd)
+}
+
+#[cfg(not(debug_assertions))]
+fn resolve_backend_command(token: &str) -> std::io::Result<Command> {
+    let exe = std::env::current_exe()?;
+    let dir = exe.parent().ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "Failed to resolve current executable directory",
+        )
+    })?;
+    let backend_exe = dir.join("aura-backend.exe");
+
+    let mut cmd = Command::new(backend_exe);
+    cmd.env("AURA_API_TOKEN", token)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    Ok(cmd)
+}
+
+#[derive(Clone)]
+pub struct SupervisorHandle {
+    stop_flag: Arc<AtomicBool>,
+    current_pid: Arc<AtomicU32>,
+    thread_handle: Arc<Mutex<Option<thread::JoinHandle<()>>>>,
+}
+
+impl SupervisorHandle {
+    /// Shutdown the supervisor thread and kill the backend process tree.
+    /// Timing constants are starting defaults (not tuned): 3s limit to join the thread.
+    pub fn shutdown(&self) {
+        self.stop_flag.store(true, Ordering::SeqCst);
+        let pid = self.current_pid.load(Ordering::SeqCst);
+        if pid != 0 {
+            kill_process_tree(pid);
+        }
+
+        let mut guard = match self.thread_handle.lock() {
+            Ok(g) => g,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+
+        if let Some(handle) = guard.take() {
+            let (tx, rx) = std::sync::mpsc::channel();
+            thread::spawn(move || {
+                let res = handle.join();
+                let _ = tx.send(res);
+            });
+            // Starting default (not tuned): 3s shutdown join timeout.
+            let _ = rx.recv_timeout(Duration::from_secs(3));
+        }
+    }
+}
+
+/// Spawns the supervisor thread monitoring the backend sidecar.
+pub fn start_supervisor(app_handle: tauri::AppHandle, token: String) -> SupervisorHandle {
+    let stop_flag = Arc::new(AtomicBool::new(false));
+    let current_pid = Arc::new(AtomicU32::new(0));
+
+    let stop_flag_clone = stop_flag.clone();
+    let current_pid_clone = current_pid.clone();
+
+    let thread = thread::Builder::new()
+        .name("backend-supervisor".into())
+        .spawn(move || {
+            let port = BACKEND_PORT;
+
+            // Preflight port check
+            if !port_is_free(port) {
+                log::error!("Port {} is already in use; terminating supervisor", port);
+                emit_status(&app_handle, "port_in_use", 0);
+                return;
+            }
+
+            let mut breaker = Breaker::new();
+            let mut attempt: u32 = 0;
+
+            // Starting default (not tuned): 90s startup grace for backend initialization.
+            const STARTUP_GRACE: Duration = Duration::from_secs(90);
+            // Starting default (not tuned): 500ms polling interval during startup grace.
+            const STARTUP_POLL_INTERVAL: Duration = Duration::from_millis(500);
+            // Starting default (not tuned): 2s steady-state health check interval.
+            const HEALTH_CHECK_INTERVAL: Duration = Duration::from_secs(2);
+            // Starting default (not tuned): 1s timeout for health check requests.
+            const HEALTH_CHECK_TIMEOUT: Duration = Duration::from_secs(1);
+            // Starting default (not tuned): 3 consecutive health failures triggers restart.
+            const MAX_CONSECUTIVE_HEALTH_FAILURES: u32 = 3;
+
+            while !stop_flag_clone.load(Ordering::SeqCst) {
+                if attempt == 0 {
+                    emit_status(&app_handle, "starting", attempt);
+                } else {
+                    emit_status(&app_handle, "restarting", attempt);
+                }
+
+                let mut cmd = match resolve_backend_command(&token) {
+                    Ok(c) => c,
+                    Err(e) => {
+                        log::error!("Failed to resolve backend command: {}", e);
+                        breaker.record_failure();
+                        if breaker.is_tripped() {
+                            emit_status(&app_handle, "failed", attempt);
+                            return;
+                        }
+                        attempt += 1;
+                        sleep_with_stop_flag(backoff_delay(attempt), &stop_flag_clone);
+                        continue;
+                    }
+                };
+
+                let mut child = match cmd.spawn() {
+                    Ok(c) => c,
+                    Err(e) => {
+                        log::error!("Failed to spawn backend process: {}", e);
+                        breaker.record_failure();
+                        if breaker.is_tripped() {
+                            emit_status(&app_handle, "failed", attempt);
+                            return;
+                        }
+                        attempt += 1;
+                        sleep_with_stop_flag(backoff_delay(attempt), &stop_flag_clone);
+                        continue;
+                    }
+                };
+
+                let child_pid = child.id();
+                current_pid_clone.store(child_pid, Ordering::SeqCst);
+
+                // Drain stdout and stderr at debug! level only (never emitted to frontend)
+                if let Some(stdout) = child.stdout.take() {
+                    thread::spawn(move || {
+                        let reader = BufReader::new(stdout);
+                        for line in reader.lines().map_while(Result::ok) {
+                            log::debug!("[backend] {}", line);
+                        }
+                    });
+                }
+
+                if let Some(stderr) = child.stderr.take() {
+                    thread::spawn(move || {
+                        let reader = BufReader::new(stderr);
+                        for line in reader.lines().map_while(Result::ok) {
+                            log::debug!("[backend-err] {}", line);
+                        }
+                    });
+                }
+
+                // Startup grace period
+                let grace_start = Instant::now();
+                let mut became_healthy = false;
+
+                while grace_start.elapsed() < STARTUP_GRACE
+                    && !stop_flag_clone.load(Ordering::SeqCst)
+                {
+                    if let Ok(Some(status)) = child.try_wait() {
+                        log::warn!(
+                            "Backend process exited prematurely during startup: {:?}",
+                            status
+                        );
+                        break;
+                    }
+
+                    if http_health_ok(port, &token, HEALTH_CHECK_TIMEOUT) {
+                        became_healthy = true;
+                        break;
+                    }
+
+                    sleep_with_stop_flag(STARTUP_POLL_INTERVAL, &stop_flag_clone);
+                }
+
+                if stop_flag_clone.load(Ordering::SeqCst) {
+                    kill_process_tree(child_pid);
+                    let _ = child.wait();
+                    current_pid_clone.store(0, Ordering::SeqCst);
+                    return;
+                }
+
+                if !became_healthy {
+                    kill_process_tree(child_pid);
+                    let _ = child.wait();
+                    current_pid_clone.store(0, Ordering::SeqCst);
+
+                    breaker.record_failure();
+                    if breaker.is_tripped() {
+                        emit_status(&app_handle, "failed", attempt);
+                        return;
+                    }
+
+                    attempt += 1;
+                    sleep_with_stop_flag(backoff_delay(attempt), &stop_flag_clone);
+                    continue;
+                }
+
+                // Backend is ready
+                emit_status(&app_handle, "ready", attempt);
+                breaker.record_healthy(Instant::now());
+
+                // Steady state monitoring
+                let mut consecutive_health_failures = 0;
+
+                while !stop_flag_clone.load(Ordering::SeqCst) {
+                    sleep_with_stop_flag(HEALTH_CHECK_INTERVAL, &stop_flag_clone);
+                    if stop_flag_clone.load(Ordering::SeqCst) {
+                        break;
+                    }
+
+                    match child.try_wait() {
+                        Ok(Some(status)) => {
+                            log::warn!("Backend process exited: {:?}", status);
+                            break;
+                        }
+                        Err(e) => {
+                            log::warn!("Error checking backend child status: {}", e);
+                            break;
+                        }
+                        Ok(None) => {}
+                    }
+
+                    if http_health_ok(port, &token, HEALTH_CHECK_TIMEOUT) {
+                        consecutive_health_failures = 0;
+                        breaker.record_healthy(Instant::now());
+                    } else {
+                        consecutive_health_failures += 1;
+                        log::warn!(
+                            "Backend health check failed ({}/{} failures)",
+                            consecutive_health_failures,
+                            MAX_CONSECUTIVE_HEALTH_FAILURES
+                        );
+                        if consecutive_health_failures >= MAX_CONSECUTIVE_HEALTH_FAILURES {
+                            log::warn!(
+                                "3 consecutive health check failures reached; restarting backend"
+                            );
+                            break;
+                        }
+                    }
+                }
+
+                kill_process_tree(child_pid);
+                let _ = child.wait();
+                current_pid_clone.store(0, Ordering::SeqCst);
+
+                if stop_flag_clone.load(Ordering::SeqCst) {
+                    return;
+                }
+
+                breaker.record_failure();
+                if breaker.is_tripped() {
+                    emit_status(&app_handle, "failed", attempt);
+                    return;
+                }
+
+                attempt += 1;
+                emit_status(&app_handle, "restarting", attempt);
+                sleep_with_stop_flag(backoff_delay(attempt), &stop_flag_clone);
+            }
+        })
+        .expect("failed to spawn supervisor thread");
+
+    SupervisorHandle {
+        stop_flag,
+        current_pid,
+        thread_handle: Arc::new(Mutex::new(Some(thread))),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -270,5 +632,26 @@ mod tests {
         assert!(!http_health_ok(port, expected_token, timeout));
 
         server_handle.join().expect("server thread failed");
+    }
+
+    #[test]
+    fn test_kill_process_tree() {
+        let mut child = Command::new("cmd")
+            .args(["/c", "ping", "-n", "30", "127.0.0.1"])
+            .spawn()
+            .expect("failed to spawn child");
+        let pid = child.id();
+        kill_process_tree(pid);
+
+        let start = Instant::now();
+        let mut exited = false;
+        while start.elapsed() < Duration::from_secs(5) {
+            if child.try_wait().unwrap().is_some() {
+                exited = true;
+                break;
+            }
+            thread::sleep(Duration::from_millis(100));
+        }
+        assert!(exited, "taskkill should terminate child within 5 seconds");
     }
 }
