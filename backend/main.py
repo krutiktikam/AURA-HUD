@@ -16,7 +16,7 @@ import json
 import logging
 import time
 from contextlib import asynccontextmanager
-from typing import List, Optional
+from typing import List, Mapping, Optional
 
 import psutil
 from fastapi import (
@@ -310,6 +310,13 @@ async def websocket_stt_live(websocket: WebSocket):
         manager.disconnect_audio(websocket)
 
 
+def reload_enabled(environ: Mapping[str, str] = os.environ) -> bool:
+    """Return True if auto-reload is enabled via AURA_RELOAD=1 and build is not frozen."""
+    if getattr(sys, "frozen", False):
+        return False
+    return environ.get("AURA_RELOAD") == "1"
+
+
 if __name__ == "__main__":
     import multiprocessing
     multiprocessing.freeze_support()
@@ -318,4 +325,5 @@ if __name__ == "__main__":
     if getattr(sys, "frozen", False):
         uvicorn.run(app, host=settings.HOST, port=settings.PORT, reload=False)
     else:
-        uvicorn.run("backend.main:app", host=settings.HOST, port=settings.PORT, reload=True)
+        reload = reload_enabled(os.environ)
+        uvicorn.run("backend.main:app", host=settings.HOST, port=settings.PORT, reload=reload)
