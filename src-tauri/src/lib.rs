@@ -3,7 +3,6 @@
     windows_subsystem = "windows"
 )]
 
-mod sidecar;
 #[cfg(windows)]
 mod job;
 pub mod supervisor;
@@ -14,7 +13,6 @@ use tauri::menu::{Menu, MenuItem};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 use serde::{Deserialize, Serialize};
 use arboard::Clipboard;
-use sidecar::spawn_backend;
 
 pub struct ApiToken(pub String);
 
@@ -228,7 +226,10 @@ pub fn run() {
                         }
                     }
                     "quit" => {
-                        std::process::exit(0);
+                        if let Some(sup) = app.try_state::<supervisor::SupervisorHandle>() {
+                            sup.shutdown();
+                        }
+                        app.exit(0);
                     }
                     _ => {}
                 })
@@ -252,8 +253,9 @@ pub fn run() {
                 let _ = app.global_shortcut().register(shortcut_space);
             }
 
-            // Initialize the sidecar backend
-            drop(spawn_backend(handle, &token));
+            // Initialize the backend supervisor
+            let supervisor_handle = supervisor::start_supervisor(handle.clone(), token.clone());
+            app.manage(supervisor_handle);
 
             Ok(())
         })
@@ -268,11 +270,17 @@ pub fn run() {
             get_clipboard_text,
             resize_window,
             get_window_state,
-            sidecar::ping_backend,
             get_api_token
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            if let tauri::RunEvent::Exit = event {
+                if let Some(sup) = app.try_state::<supervisor::SupervisorHandle>() {
+                    sup.shutdown();
+                }
+            }
+        });
 }
 
 #[cfg(test)]
