@@ -4,6 +4,8 @@
 )]
 
 mod sidecar;
+#[cfg(windows)]
+mod job;
 
 use tauri::Manager;
 use tauri::tray::{TrayIconBuilder, TrayIconEvent, MouseButton, MouseButtonState};
@@ -154,6 +156,21 @@ fn get_window_state() -> String {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[cfg(windows)]
+    let _job = match job::JobObject::new() {
+        Ok(job) => match job.assign_current_process() {
+            Ok(()) => Some(job),
+            Err(e) => {
+                log::warn!("Failed to assign current process to Windows job object: {}", e);
+                None
+            }
+        },
+        Err(e) => {
+            log::warn!("Failed to create Windows job object: {}", e);
+            None
+        }
+    };
+
     tauri::Builder::default()
         .plugin(tauri_plugin_log::Builder::new().build())
         .plugin(tauri_plugin_shell::init())
