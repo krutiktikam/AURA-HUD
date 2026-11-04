@@ -186,30 +186,72 @@ fn sleep_with_stop_flag(duration: Duration, stop_flag: &AtomicBool) {
 }
 
 #[cfg(debug_assertions)]
-fn resolve_backend_command(token: &str) -> std::io::Result<Command> {
-    let candidates = [
-        std::path::PathBuf::from("venv/Scripts/python.exe"),
-        std::path::PathBuf::from("../venv/Scripts/python.exe"),
-    ];
-
-    let mut python_path = None;
-    for candidate in &candidates {
-        if candidate.exists() {
-            python_path = Some(candidate.clone());
-            break;
+fn find_workspace_root() -> std::io::Result<std::path::PathBuf> {
+    if let Ok(cwd) = std::env::current_dir() {
+        if cwd.join("backend").exists() {
+            return Ok(cwd);
+        }
+        if let Some(parent) = cwd.parent() {
+            if parent.join("backend").exists() {
+                return Ok(parent.to_path_buf());
+            }
+            if let Some(grandparent) = parent.parent() {
+                if grandparent.join("backend").exists() {
+                    return Ok(grandparent.to_path_buf());
+                }
+            }
         }
     }
 
-    let py = python_path.ok_or_else(|| {
-        std::io::Error::new(
-            std::io::ErrorKind::NotFound,
-            "Python virtual environment not found in venv/Scripts/python.exe or ../venv/Scripts/python.exe",
-        )
-    })?;
+    if let Ok(exe) = std::env::current_exe() {
+        for ancestor in exe.ancestors() {
+            if ancestor.join("backend").exists() {
+                return Ok(ancestor.to_path_buf());
+            }
+        }
+    }
+
+    if std::path::Path::new("backend").exists() {
+        return Ok(std::path::PathBuf::from("."));
+    }
+    if std::path::Path::new("../backend").exists() {
+        return Ok(std::path::PathBuf::from(".."));
+    }
+
+    Err(std::io::Error::new(
+        std::io::ErrorKind::NotFound,
+        "Workspace root directory containing backend/ not found",
+    ))
+}
+
+#[cfg(debug_assertions)]
+fn resolve_backend_command(token: &str) -> std::io::Result<Command> {
+    let root_dir = find_workspace_root()?;
+
+    let venv_python = root_dir.join("venv").join("Scripts").join("python.exe");
+    let py = if venv_python.exists() {
+        venv_python
+    } else {
+        let fallback_candidates = [
+            std::path::PathBuf::from("venv/Scripts/python.exe"),
+            std::path::PathBuf::from("../venv/Scripts/python.exe"),
+        ];
+        fallback_candidates
+            .into_iter()
+            .find(|p| p.exists())
+            .ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    "Python virtual environment not found in venv/Scripts/python.exe or ../venv/Scripts/python.exe",
+                )
+            })?
+    };
 
     let mut cmd = Command::new(py);
     cmd.args(["-m", "backend.main"])
+        .current_dir(&root_dir)
         .env("AURA_API_TOKEN", token)
+        .env("PYTHONPATH", &root_dir)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
@@ -218,12 +260,6 @@ fn resolve_backend_command(token: &str) -> std::io::Result<Command> {
         use std::os::windows::process::CommandExt;
         const CREATE_NO_WINDOW: u32 = 0x08000000;
         cmd.creation_flags(CREATE_NO_WINDOW);
-    }
-
-    if std::path::Path::new("backend").exists() {
-        // Current directory is repo root
-    } else if std::path::Path::new("../backend").exists() {
-        cmd.current_dir("..");
     }
 
     Ok(cmd)
@@ -653,5 +689,21 @@ mod tests {
             thread::sleep(Duration::from_millis(100));
         }
         assert!(exited, "taskkill should terminate child within 5 seconds");
+    }
+
+    #[test]
+    #[cfg(debug_assertions)]
+    fn test_resolve_backend_command_workspace_root() {
+        let cmd = resolve_backend_command("test-token");
+        assert!(cmd.is_ok(), "resolve_backend_command should succeed");
+        let cmd = cmd.unwrap();
+
+        let current_dir = cmd.get_current_dir();
+        assert!(current_dir.is_some(), "current_dir must be set");
+        let dir = current_dir.unwrap();
+        assert!(dir.join("backend").exists(), "current_dir must contain backend/");
+
+        let has_pythonpath = cmd.get_envs().any(|(k, v)| k == "PYTHONPATH" && v.is_some());
+        assert!(has_pythonpath, "PYTHONPATH must be set");
     }
 }
