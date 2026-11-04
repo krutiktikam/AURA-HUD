@@ -31,3 +31,25 @@ def test_import_backend_main_isolation(tmp_path: Path):
 
     assert result.returncode == 0, f"Subprocess failed: {result.stderr}"
     assert not db_path.exists(), "Clipboard database was created on import"
+
+
+def test_env_example_host_and_defaults():
+    env_example_path = Path(__file__).parent.parent / ".env.example"
+    content = env_example_path.read_text(encoding="utf-8")
+    assert 'HOST="0.0.0.0"' not in content
+    assert 'HOST="127.0.0.1"' in content
+    assert 'WHISPER_MODEL_SIZE="tiny.en"' in content
+
+
+def test_reload_enabled(monkeypatch):
+    from backend.main import reload_enabled
+
+    # Enabled only when AURA_RELOAD == "1"
+    assert reload_enabled({"AURA_RELOAD": "1"}) is True
+    assert reload_enabled({"AURA_RELOAD": "0"}) is False
+    assert reload_enabled({"AURA_RELOAD": "true"}) is False
+    assert reload_enabled({}) is False
+
+    # Frozen builds never reload even with AURA_RELOAD == "1"
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    assert reload_enabled({"AURA_RELOAD": "1"}) is False

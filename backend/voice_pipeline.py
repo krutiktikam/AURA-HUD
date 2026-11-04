@@ -46,16 +46,19 @@ class VoicePipeline:
 
     def __init__(self):
         self.stt_model: Optional[Any] = None
+        self.stt_state: str = "idle"
         self._stt_lock = asyncio.Lock()
 
     async def get_stt_model(self) -> Any:
         """Lazily load Faster-Whisper model on first use behind an asyncio lock."""
         if not HAS_FASTER_WHISPER:
+            self.stt_state = "failed"
             raise STTUnavailableError("faster-whisper package is not installed")
 
         if self.stt_model is None:
             async with self._stt_lock:
                 if self.stt_model is None:
+                    self.stt_state = "loading"
                     try:
                         loop = asyncio.get_running_loop()
                         download_root = getattr(
@@ -77,8 +80,10 @@ class VoicePipeline:
                             )
 
                         self.stt_model = await loop.run_in_executor(None, _load_model)
+                        self.stt_state = "ready"
                         logger.info("Faster-Whisper model loaded successfully.")
                     except Exception as e:
+                        self.stt_state = "failed"
                         logger.error(f"Could not initialize Faster-Whisper model: {e}")
                         raise STTUnavailableError(
                             f"Could not initialize Faster-Whisper model: {e}"

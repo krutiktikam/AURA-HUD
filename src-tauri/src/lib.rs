@@ -3,7 +3,9 @@
     windows_subsystem = "windows"
 )]
 
-mod sidecar;
+#[cfg(windows)]
+mod job;
+pub mod supervisor;
 
 use tauri::Manager;
 use tauri::tray::{TrayIconBuilder, TrayIconEvent, MouseButton, MouseButtonState};
@@ -11,7 +13,6 @@ use tauri::menu::{Menu, MenuItem};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 use serde::{Deserialize, Serialize};
 use arboard::Clipboard;
-use sidecar::spawn_backend;
 
 pub struct ApiToken(pub String);
 
@@ -154,9 +155,23 @@ fn get_window_state() -> String {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[cfg(windows)]
+    let _job = match job::JobObject::new() {
+        Ok(job) => match job.assign_current_process() {
+            Ok(()) => Some(job),
+            Err(e) => {
+                log::warn!("Failed to assign current process to Windows job object: {}", e);
+                None
+            }
+        },
+        Err(e) => {
+            log::warn!("Failed to create Windows job object: {}", e);
+            None
+        }
+    };
+
     tauri::Builder::default()
         .plugin(tauri_plugin_log::Builder::new().build())
-        .plugin(tauri_plugin_shell::init())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, _shortcut, event| {
@@ -210,7 +225,10 @@ pub fn run() {
                         }
                     }
                     "quit" => {
-                        std::process::exit(0);
+                        if let Some(sup) = app.try_state::<supervisor::SupervisorHandle>() {
+                            sup.shutdown();
+                        }
+                        app.exit(0);
                     }
                     _ => {}
                 })
@@ -234,8 +252,9 @@ pub fn run() {
                 let _ = app.global_shortcut().register(shortcut_space);
             }
 
-            // Initialize the sidecar backend
-            drop(spawn_backend(handle, &token));
+            // Initialize the backend supervisor
+            let supervisor_handle = supervisor::start_supervisor(handle.clone(), token.clone());
+            app.manage(supervisor_handle);
 
             Ok(())
         })
@@ -250,11 +269,17 @@ pub fn run() {
             get_clipboard_text,
             resize_window,
             get_window_state,
-            sidecar::ping_backend,
             get_api_token
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            if let tauri::RunEvent::Exit = event {
+                if let Some(sup) = app.try_state::<supervisor::SupervisorHandle>() {
+                    sup.shutdown();
+                }
+            }
+        });
 }
 
 #[cfg(test)]
