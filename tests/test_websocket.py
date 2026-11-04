@@ -100,3 +100,83 @@ def test_websocket_ollama_connect_error_returns_error_event_and_keeps_open(clien
         msg_done = websocket.receive_json()
         assert msg_done == {"event": "ai_done", "full_text": "recovered"}
 
+
+def test_websocket_ai_timeout_returns_error_event_and_keeps_open(client: TestClient):
+    def timeout_handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ReadTimeout("Timeout before first token", request=request)
+
+    app.state.ollama_client = OllamaClient(transport=httpx.MockTransport(timeout_handler))
+
+    with client.websocket_connect("/api/stt/live") as websocket:
+        websocket.send_json({"type": "chat", "prompt": "will timeout"})
+
+        err_msg = websocket.receive_json()
+        assert err_msg == {"event": "error", "code": "ai_timeout"}
+
+        # Socket remains open
+        def ok_handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, content=b'{"response": "works now"}\n')
+
+        app.state.ollama_client = OllamaClient(transport=httpx.MockTransport(ok_handler))
+        websocket.send_json({"type": "chat", "prompt": "retry"})
+
+        assert websocket.receive_json() == {"event": "ai_start"}
+        assert websocket.receive_json() == {"event": "ai_token", "token": "works now"}
+        assert websocket.receive_json() == {"event": "ai_done", "full_text": "works now"}
+
+
+def test_websocket_ai_stream_interrupted_then_recovers(client: TestClient):
+    def midstream_fail_handler(request: httpx.Request) -> httpx.Response:
+        async def body():
+            yield b'{"response": "chunk1"}\n'
+            raise httpx.ReadTimeout("Stream read failed mid-stream", request=request)
+
+        return httpx.Response(200, content=body())
+
+    app.state.ollama_client = OllamaClient(transport=httpx.MockTransport(midstream_fail_handler))
+
+    with client.websocket_connect("/api/stt/live") as websocket:
+        websocket.send_json({"type": "chat", "prompt": "stream fail"})
+
+        assert websocket.receive_json() == {"event": "ai_start"}
+        assert websocket.receive_json() == {"event": "ai_token", "token": "chunk1"}
+        assert websocket.receive_json() == {"event": "error", "code": "ai_stream_interrupted"}
+
+        # Subsequent message works
+        def ok_handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, content=b'{"response": "next chunk"}\n')
+
+        app.state.ollama_client = OllamaClient(transport=httpx.MockTransport(ok_handler))
+        websocket.send_json({"type": "chat", "prompt": "try again"})
+
+        assert websocket.receive_json() == {"event": "ai_start"}
+        assert websocket.receive_json() == {"event": "ai_token", "token": "next chunk"}
+        assert websocket.receive_json() == {"event": "ai_done", "full_text": "next chunk"}
+
+
+def test_websocket_bad_request_returns_error_and_keeps_open(client: TestClient):
+    def ok_handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=b'{"response": "valid"}\n')
+
+    app.state.ollama_client = OllamaClient(transport=httpx.MockTransport(ok_handler))
+
+    with client.websocket_connect("/api/stt/live") as websocket:
+        # Invalid JSON string
+        websocket.send_text("not a json string")
+        assert websocket.receive_json() == {"event": "error", "code": "bad_request"}
+
+        # Valid JSON but not an object (e.g. array)
+        websocket.send_text("[1, 2, 3]")
+        assert websocket.receive_json() == {"event": "error", "code": "bad_request"}
+
+        # Object with invalid / missing type
+        websocket.send_json({"type": "unknown_type"})
+        assert websocket.receive_json() == {"event": "error", "code": "bad_request"}
+
+        # Subsequent valid message succeeds
+        websocket.send_json({"type": "chat", "prompt": "hello"})
+        assert websocket.receive_json() == {"event": "ai_start"}
+        assert websocket.receive_json() == {"event": "ai_token", "token": "valid"}
+        assert websocket.receive_json() == {"event": "ai_done", "full_text": "valid"}
+
+
