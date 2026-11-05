@@ -27,13 +27,7 @@ def test_health_ollama_up(client: TestClient):
     assert data["ollama_state"] == "ok"
     assert data["stt_state"] == "ready"
     assert data["db_state"] == "ok"
-    assert "audio" in data
-    audio = data["audio"]
-    assert "devices_count" in audio
-    assert "input_index" in audio
-    assert "output_index" in audio
-    assert "sample_rate" in audio
-    assert "stt_loaded" in audio
+    assert "audio" not in data
 
 
 def test_health_ollama_down(client: TestClient):

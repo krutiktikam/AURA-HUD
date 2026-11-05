@@ -209,20 +209,6 @@ async def health_check(request: Request):
 
         "db_state": db_state,
 
-        "audio": {
-
-            "devices_count": 0,
-
-            "input_index": settings.AUDIO_INPUT_DEVICE_INDEX,
-
-            "output_index": settings.AUDIO_OUTPUT_DEVICE_INDEX,
-
-            "sample_rate": settings.SAMPLE_RATE,
-
-            "stt_loaded": getattr(pipeline, "stt_model", None) is not None,
-
-        },
-
     }
 
 
