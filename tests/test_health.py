@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import httpx
 from fastapi.testclient import TestClient
 
@@ -27,13 +29,7 @@ def test_health_ollama_up(client: TestClient):
     assert data["ollama_state"] == "ok"
     assert data["stt_state"] == "ready"
     assert data["db_state"] == "ok"
-    assert "audio" in data
-    audio = data["audio"]
-    assert "devices_count" in audio
-    assert "input_index" in audio
-    assert "output_index" in audio
-    assert "sample_rate" in audio
-    assert "stt_loaded" in audio
+    assert "audio" not in data
 
 
 def test_health_ollama_down(client: TestClient):
@@ -83,3 +79,15 @@ def test_health_stt_failed(client: TestClient):
 
     assert data["status"] == "degraded"
     assert data["stt_state"] == "failed"
+
+
+@patch("psutil.cpu_percent")
+def test_system_telemetry_cpu_percent(mock_cpu_percent, client: TestClient):
+    mock_cpu_percent.return_value = 15.0
+
+    res = client.get("/api/system/telemetry")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["cpu"] == 15.0
+    mock_cpu_percent.assert_called_with(interval=None)
+

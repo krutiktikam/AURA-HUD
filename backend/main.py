@@ -60,6 +60,8 @@ logger = logging.getLogger("MainServer")
 @asynccontextmanager
 
 async def lifespan(app: FastAPI):
+    # Prime CPU percent metric at startup
+    psutil.cpu_percent(interval=None)
 
     # Initialize API token (fails closed if missing or < 32 characters)
 
@@ -209,20 +211,6 @@ async def health_check(request: Request):
 
         "db_state": db_state,
 
-        "audio": {
-
-            "devices_count": 0,
-
-            "input_index": settings.AUDIO_INPUT_DEVICE_INDEX,
-
-            "output_index": settings.AUDIO_OUTPUT_DEVICE_INDEX,
-
-            "sample_rate": settings.SAMPLE_RATE,
-
-            "stt_loaded": getattr(pipeline, "stt_model", None) is not None,
-
-        },
-
     }
 
 
@@ -237,7 +225,7 @@ async def get_system_telemetry():
 
     try:
 
-        cpu = psutil.cpu_percent(interval=0.1)
+        cpu = psutil.cpu_percent(interval=None)
 
         mem = psutil.virtual_memory()
 
@@ -499,11 +487,17 @@ if __name__ == "__main__":
 
     if getattr(sys, "frozen", False):
 
-        uvicorn.run(app, host=settings.HOST, port=settings.PORT, reload=False)
+        uvicorn.run(app, host=settings.HOST, port=settings.PORT, reload=False, access_log=False)
 
     else:
 
         reload = reload_enabled(os.environ)
 
-        uvicorn.run("backend.main:app", host=settings.HOST, port=settings.PORT, reload=reload)
+        uvicorn.run(
+            "backend.main:app",
+            host=settings.HOST,
+            port=settings.PORT,
+            reload=reload,
+            access_log=False,
+        )
 
