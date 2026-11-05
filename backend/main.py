@@ -60,6 +60,8 @@ logger = logging.getLogger("MainServer")
 @asynccontextmanager
 
 async def lifespan(app: FastAPI):
+    # Prime CPU percent metric at startup
+    psutil.cpu_percent(interval=None)
 
     # Initialize API token (fails closed if missing or < 32 characters)
 
@@ -223,7 +225,7 @@ async def get_system_telemetry():
 
     try:
 
-        cpu = psutil.cpu_percent(interval=0.1)
+        cpu = psutil.cpu_percent(interval=None)
 
         mem = psutil.virtual_memory()
 
