@@ -499,11 +499,17 @@ if __name__ == "__main__":
 
     if getattr(sys, "frozen", False):
 
-        uvicorn.run(app, host=settings.HOST, port=settings.PORT, reload=False)
+        uvicorn.run(app, host=settings.HOST, port=settings.PORT, reload=False, access_log=False)
 
     else:
 
         reload = reload_enabled(os.environ)
 
-        uvicorn.run("backend.main:app", host=settings.HOST, port=settings.PORT, reload=reload)
+        uvicorn.run(
+            "backend.main:app",
+            host=settings.HOST,
+            port=settings.PORT,
+            reload=reload,
+            access_log=False,
+        )
 
