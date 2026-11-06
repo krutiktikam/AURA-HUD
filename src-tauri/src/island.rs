@@ -1,3 +1,6 @@
+use tauri::Manager;
+use tauri::{LogicalSize, PhysicalPosition, Position, Size};
+
 // Layout defaults; UI uses the same numbers.
 pub const COLLAPSED: (f64, f64) = (220.0, 64.0);
 pub const EXPANDED: (f64, f64) = (600.0, 420.0);
@@ -26,6 +29,66 @@ pub fn island_position(
     let y = mon_y + physical_margin;
 
     (x, y)
+}
+
+/// Helper to position and resize the window for collapsed or expanded mode on primary monitor (fallback: current).
+pub fn position_island(window: &tauri::WebviewWindow, expanded: bool) -> Result<(), String> {
+    let (w, h) = if expanded { EXPANDED } else { COLLAPSED };
+
+    let monitor = window
+        .primary_monitor()
+        .map_err(|e| e.to_string())?
+        .or_else(|| window.current_monitor().ok().flatten())
+        .ok_or_else(|| "No monitor found".to_string())?;
+
+    let mon_pos = monitor.position();
+    let mon_size = monitor.size();
+    let scale = monitor.scale_factor();
+
+    let (phys_x, phys_y) = island_position(
+        (mon_pos.x, mon_pos.y),
+        (mon_size.width, mon_size.height),
+        scale,
+        (w, h),
+        TOP_MARGIN,
+    );
+
+    window
+        .set_size(Size::Logical(LogicalSize::new(w, h)))
+        .map_err(|e| e.to_string())?;
+
+    window
+        .set_position(Position::Physical(PhysicalPosition::new(phys_x, phys_y)))
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+/// Sizes the main window to COLLAPSED or EXPANDED, positions it on the primary monitor
+/// (fallback: current monitor), and on expand also shows and focuses the window.
+#[tauri::command]
+pub fn set_island_mode(app: tauri::AppHandle, expanded: bool) -> Result<(), String> {
+    let window = app
+        .get_webview_window("main")
+        .ok_or_else(|| "Main window not found".to_string())?;
+
+    position_island(&window, expanded)?;
+
+    if expanded {
+        window.show().map_err(|e| e.to_string())?;
+        window.set_focus().map_err(|e| e.to_string())?;
+    }
+
+    Ok(())
+}
+
+/// Shared quit helper: shuts down the supervisor thread then exits the app.
+#[tauri::command]
+pub fn quit_app(app: tauri::AppHandle) {
+    if let Some(sup) = app.try_state::<crate::supervisor::SupervisorHandle>() {
+        sup.shutdown();
+    }
+    app.exit(0);
 }
 
 #[cfg(test)]
