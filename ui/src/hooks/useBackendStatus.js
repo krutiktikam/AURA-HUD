@@ -65,7 +65,7 @@ export function useBackendStatus(isExpanded = false) {
         }
       })
       .catch(() => {
-        // Plain browser / mock fallback: invoke failures ignored
+        // Plain browser fallback: invoke failures ignored
       });
 
     return () => {
