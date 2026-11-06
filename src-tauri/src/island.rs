@@ -111,6 +111,14 @@ mod tests {
     }
 
     #[test]
+    fn test_island_position_scale_1_25() {
+        let pos = island_position((0, 0), (1920, 1080), 1.25, EXPANDED, TOP_MARGIN);
+        // (600 * 1.25) = 750; (1920 - 750) / 2 = 585
+        // 12 * 1.25 = 15
+        assert_eq!(pos, (585, 15));
+    }
+
+    #[test]
     fn test_island_position_negative_x() {
         let pos = island_position((-1920, 0), (1920, 1080), 1.0, COLLAPSED, TOP_MARGIN);
         // -1920 + 850 = -1070

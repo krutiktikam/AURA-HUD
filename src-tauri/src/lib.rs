@@ -137,7 +137,9 @@ pub fn run() {
 
             // Register Hotkey: Ctrl+Shift+A
             if let Ok(shortcut_a) = "Ctrl+Shift+A".parse::<Shortcut>() {
-                let _ = app.global_shortcut().register(shortcut_a);
+                if let Err(e) = app.global_shortcut().register(shortcut_a) {
+                    log::warn!("Failed to register Ctrl+Shift+A global shortcut: {}", e);
+                }
             }
 
             // Initialize the backend supervisor
