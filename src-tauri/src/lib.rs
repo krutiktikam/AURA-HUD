@@ -6,6 +6,7 @@
 #[cfg(windows)]
 mod job;
 pub mod supervisor;
+pub mod island;
 
 use tauri::Manager;
 use tauri::tray::{TrayIconBuilder, TrayIconEvent, MouseButton, MouseButtonState};
