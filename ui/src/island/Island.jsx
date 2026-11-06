@@ -2,6 +2,11 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { useBackendStatus } from '../hooks/useBackendStatus';
 import { useChatSocket } from '../hooks/useChatSocket';
+import { categorizeClipboard, getActionsForCategory } from './actions';
+import ChatTab from './tabs/ChatTab';
+import ClipboardTab from './tabs/ClipboardTab';
+import StatsTab from './tabs/StatsTab';
+import ControlsTab from './tabs/ControlsTab';
 
 const STATUS_COLORS = {
   ready: '#a3e635',
@@ -30,20 +35,95 @@ const safeInvoke = async (cmd, args = {}) => {
 export default function Island() {
   const [isExpanded, setIsExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState('chat');
+  const [clipboardContent, setClipboardContent] = useState(null);
+  const [voiceRepliesEnabled, setVoiceRepliesEnabled] = useState(false);
+  const [localVoices, setLocalVoices] = useState([]);
+
   const isTransitioningRef = useRef(false);
   const shouldReduceMotion = useReducedMotion();
 
+  // Detect and filter speech synthesis voices to localService === true
+  useEffect(() => {
+    const updateVoices = () => {
+      if ('speechSynthesis' in window) {
+        const voices = window.speechSynthesis.getVoices();
+        const offlineVoices = voices.filter((v) => v.localService === true);
+        setLocalVoices(offlineVoices);
+      }
+    };
+
+    updateVoices();
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.addEventListener('voiceschanged', updateVoices);
+      return () => {
+        window.speechSynthesis.removeEventListener('voiceschanged', updateVoices);
+      };
+    }
+  }, []);
+
+  const handleAiDone = useCallback(
+    (fullText) => {
+      if (!voiceRepliesEnabled || localVoices.length === 0 || !('speechSynthesis' in window)) {
+        return;
+      }
+      try {
+        window.speechSynthesis.cancel();
+        const clean = fullText.replace(/[\*\_#\`\[\]]/g, '');
+        const utterance = new SpeechSynthesisUtterance(clean);
+        utterance.voice = localVoices[0];
+        window.speechSynthesis.speak(utterance);
+      } catch {
+        // Speech synthesis error ignored
+      }
+    },
+    [voiceRepliesEnabled, localVoices]
+  );
+
   const { pillState } = useBackendStatus(isExpanded);
-  const { connection, messages, isThinking, send, error } = useChatSocket();
+  const { messages, isThinking, send, error } = useChatSocket({
+    onAiDone: handleAiDone,
+  });
+
+  // Read current clipboard text once on expand
+  const refreshClipboard = useCallback(async () => {
+    try {
+      let text = '';
+      const isTauri =
+        typeof window !== 'undefined' &&
+        (Boolean(window.__TAURI_INTERNALS__) || Boolean(window.__TAURI__));
+      if (isTauri) {
+        const { invoke } = await import('@tauri-apps/api/core');
+        const clip = await invoke('get_clipboard_text');
+        if (clip && clip.has_content) {
+          text = clip.text;
+        }
+      } else if (navigator.clipboard?.readText) {
+        text = (await navigator.clipboard.readText()).trim();
+      }
+
+      if (text && text.trim().length > 0) {
+        const category = categorizeClipboard(text);
+        setClipboardContent({ text, category });
+      } else {
+        setClipboardContent(null);
+      }
+    } catch {
+      setClipboardContent(null);
+    }
+  }, []);
 
   // Expand: await invoke("set_island_mode", { expanded: true }), then set expanded
-  const handleExpand = useCallback(async (tab = 'chat') => {
-    if (isTransitioningRef.current || isExpanded) return;
-    isTransitioningRef.current = true;
-    if (tab) setActiveTab(tab);
-    await safeInvoke('set_island_mode', { expanded: true });
-    setIsExpanded(true);
-  }, [isExpanded]);
+  const handleExpand = useCallback(
+    async (tab = 'chat') => {
+      if (isTransitioningRef.current || isExpanded) return;
+      isTransitioningRef.current = true;
+      if (tab) setActiveTab(tab);
+      await refreshClipboard();
+      await safeInvoke('set_island_mode', { expanded: true });
+      setIsExpanded(true);
+    },
+    [isExpanded, refreshClipboard]
+  );
 
   // Collapse: set collapsed, and on animation complete invoke("set_island_mode", { expanded: false })
   const handleCollapse = useCallback(() => {
@@ -117,11 +197,25 @@ export default function Island() {
     }
   };
 
+  const handleActionChipClick = (chip) => {
+    if (!clipboardContent) return;
+    const prompt = chip.prompt(clipboardContent.text);
+    send(prompt);
+    setActiveTab('chat');
+  };
+
+  const handleQuitApp = async () => {
+    await safeInvoke('quit_app');
+  };
+
   const transitionConfig = shouldReduceMotion
     ? { duration: 0 }
     : { type: 'spring', stiffness: 380, damping: 30 };
 
   const statusColor = STATUS_COLORS[pillState] || STATUS_COLORS.unknown;
+  const actionChips = clipboardContent
+    ? getActionsForCategory(clipboardContent.category)
+    : [];
 
   return (
     <div className="w-full h-full flex items-center justify-center bg-transparent select-none p-0 overflow-hidden font-sans">
@@ -226,9 +320,33 @@ export default function Island() {
                   transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.15 }}
                   className="w-full h-full flex flex-col min-h-0"
                 >
-                  <motion.div layout="position" className="text-xs text-[#9aa3ad]">
-                    {activeTab}
-                  </motion.div>
+                  {activeTab === 'chat' && (
+                    <ChatTab
+                      messages={messages}
+                      isThinking={isThinking}
+                      send={send}
+                      error={error}
+                      clipboardContent={clipboardContent}
+                      actionChips={actionChips}
+                      onActionClick={handleActionChipClick}
+                    />
+                  )}
+                  {activeTab === 'clipboard' && (
+                    <ClipboardTab
+                      clipboardContent={clipboardContent}
+                      actionChips={actionChips}
+                      onActionClick={handleActionChipClick}
+                    />
+                  )}
+                  {activeTab === 'stats' && <StatsTab />}
+                  {activeTab === 'controls' && (
+                    <ControlsTab
+                      voiceRepliesEnabled={voiceRepliesEnabled}
+                      onToggleVoiceReplies={setVoiceRepliesEnabled}
+                      hasLocalVoices={localVoices.length > 0}
+                      onQuitApp={handleQuitApp}
+                    />
+                  )}
                 </motion.div>
               </AnimatePresence>
             </div>
