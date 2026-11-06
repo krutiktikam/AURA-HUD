@@ -21,24 +21,7 @@ const Clipboard = () => {
         }
       } catch (err) {
         setError('Failed to fetch clipboard history');
-        // Generate mock data for demonstration
-        setHistory([
-          {
-            content: "Hello world example text...",
-            category: "text",
-            timestamp: new Date(Date.now() - 2 * 60 * 1000).toISOString()
-          },
-          {
-            content: "const example = () => { return 'code'; };",
-            category: "code",
-            timestamp: new Date(Date.now() - 5 * 60 * 1000).toISOString()
-          },
-          {
-            content: "https://example.com/article",
-            category: "url",
-            timestamp: new Date(Date.now() - 10 * 60 * 1000).toISOString()
-          }
-        ]);
+        setHistory([]);
       } finally {
         setLoading(false);
       }
@@ -114,7 +97,7 @@ const Clipboard = () => {
 
               <div className="flex items-center justify-between mt-2">
                 <span className="text-white/50 text-xs">
-                  {new Date(item.timestamp).toLocaleString()}
+                  {new Date(item.timestamp * 1000).toLocaleString()}
                 </span>
                 <button
                   onClick={() => {
