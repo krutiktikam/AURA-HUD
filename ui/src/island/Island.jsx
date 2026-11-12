@@ -230,7 +230,7 @@ export default function Island() {
         onAnimationComplete={handleAnimationComplete}
         style={{
           borderRadius: isExpanded ? 28 : 20,
-          backgroundColor: 'rgba(22, 22, 22, 0.92)',
+          backgroundColor: 'rgba(22, 22, 22, 0.97)',
           border: '1px solid rgba(255, 255, 255, 0.1)',
           boxSizing: 'border-box',
           overflow: 'hidden',
