@@ -68,6 +68,7 @@ pub fn position_island(window: &tauri::WebviewWindow, expanded: bool) -> Result<
 /// (fallback: current monitor), and on expand also shows and focuses the window.
 #[tauri::command]
 pub fn set_island_mode(app: tauri::AppHandle, expanded: bool) -> Result<(), String> {
+    log::info!("set_island_mode expanded={}", expanded);
     let window = app
         .get_webview_window("main")
         .ok_or_else(|| "Main window not found".to_string())?;
@@ -76,7 +77,10 @@ pub fn set_island_mode(app: tauri::AppHandle, expanded: bool) -> Result<(), Stri
 
     if expanded {
         window.show().map_err(|e| e.to_string())?;
-        window.set_focus().map_err(|e| e.to_string())?;
+        window.set_focus().map_err(|e| {
+            log::warn!("Failed to set focus: {}", e);
+            e.to_string()
+        })?;
     }
 
     Ok(())

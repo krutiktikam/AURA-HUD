@@ -89,6 +89,7 @@ pub fn run() {
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, _shortcut, event| {
                     if event.state() == ShortcutState::Pressed {
+                        log::info!("hotkey pressed");
                         let _ = app.emit("island-toggle", ());
                     }
                 })
@@ -154,10 +155,14 @@ pub fn run() {
 
             Ok(())
         })
-        .on_window_event(|_window, event| {
-            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+        .on_window_event(|_window, event| match event {
+            tauri::WindowEvent::CloseRequested { api, .. } => {
                 api.prevent_close();
             }
+            tauri::WindowEvent::Focused(focused) => {
+                log::info!("window focus changed: {}", focused);
+            }
+            _ => {}
         })
         .invoke_handler(tauri::generate_handler![
             get_clipboard_text,
