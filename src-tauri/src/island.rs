@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tauri::Manager;
 use tauri::{LogicalSize, PhysicalPosition, Position, Size};
 
@@ -85,6 +85,25 @@ pub fn position_island(window: &tauri::WebviewWindow, expanded: bool) -> Result<
     Ok(())
 }
 
+/// Applies island position, click-through, and on expand shows and focuses the window.
+pub fn apply_island_mode(window: &tauri::WebviewWindow, expanded: bool) -> Result<(), String> {
+    position_island(window, expanded)?;
+
+    if let Err(e) = window.set_ignore_cursor_events(click_through_for_mode(expanded)) {
+        log::warn!("Failed to set ignore cursor events: {}", e);
+    }
+
+    if expanded {
+        window.show().map_err(|e| e.to_string())?;
+        window.set_focus().map_err(|e| {
+            log::warn!("Failed to set focus: {}", e);
+            e.to_string()
+        })?;
+    }
+
+    Ok(())
+}
+
 /// Sizes the main window to COLLAPSED or EXPANDED, positions it on the primary monitor
 /// (fallback: current monitor), and on expand also shows and focuses the window.
 #[tauri::command]
@@ -94,14 +113,22 @@ pub fn set_island_mode(app: tauri::AppHandle, expanded: bool) -> Result<(), Stri
         .get_webview_window("main")
         .ok_or_else(|| "Main window not found".to_string())?;
 
-    position_island(&window, expanded)?;
+    apply_island_mode(&window, expanded)?;
 
-    if expanded {
-        window.show().map_err(|e| e.to_string())?;
-        window.set_focus().map_err(|e| {
-            log::warn!("Failed to set focus: {}", e);
-            e.to_string()
-        })?;
+    if let Some(state_mutex) = app.try_state::<std::sync::Mutex<IslandState>>() {
+        match state_mutex.lock() {
+            Ok(mut state) => {
+                state.expanded = expanded;
+                state.expanded_at = if expanded {
+                    Some(Instant::now())
+                } else {
+                    None
+                };
+            }
+            Err(e) => {
+                log::warn!("Failed to lock IslandState in set_island_mode: {}", e);
+            }
+        }
     }
 
     Ok(())

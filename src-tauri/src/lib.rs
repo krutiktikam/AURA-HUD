@@ -85,6 +85,7 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_log::Builder::new().level(log::LevelFilter::Info).build())
+        .manage(std::sync::Mutex::new(island::IslandState::default()))
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, _shortcut, event| {
@@ -149,7 +150,7 @@ pub fn run() {
 
             // Position collapsed window at top center, then show it
             if let Some(window) = app.get_webview_window("main") {
-                let _ = island::position_island(&window, false);
+                let _ = island::apply_island_mode(&window, false);
                 let _ = window.show();
             }
 
