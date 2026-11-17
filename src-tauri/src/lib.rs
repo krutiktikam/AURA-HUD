@@ -156,12 +156,33 @@ pub fn run() {
 
             Ok(())
         })
-        .on_window_event(|_window, event| match event {
+        .on_window_event(|window, event| match event {
             tauri::WindowEvent::CloseRequested { api, .. } => {
                 api.prevent_close();
             }
             tauri::WindowEvent::Focused(focused) => {
                 log::info!("window focus changed: {}", focused);
+                if !focused {
+                    if let Some(state_mutex) =
+                        window.app_handle().try_state::<std::sync::Mutex<island::IslandState>>()
+                    {
+                        match state_mutex.lock() {
+                            Ok(state) => {
+                                let since_expand = state.expanded_at.map(|t| t.elapsed());
+                                if island::should_collapse_on_blur(
+                                    state.expanded,
+                                    since_expand,
+                                    island::BLUR_GRACE,
+                                ) {
+                                    let _ = window.app_handle().emit("island-blur", ());
+                                }
+                            }
+                            Err(e) => {
+                                log::warn!("Failed to lock IslandState on blur: {}", e);
+                            }
+                        }
+                    }
+                }
             }
             _ => {}
         })
