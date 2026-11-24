@@ -24,6 +24,42 @@ pub fn restore_target(island_focused: bool, prev: Option<isize>) -> Option<isize
     }
 }
 
+#[cfg(windows)]
+pub fn capture_foreground() -> Option<isize> {
+    use windows_sys::Win32::UI::WindowsAndMessaging::GetForegroundWindow;
+    // SAFETY: GetForegroundWindow has no preconditions and queries the system for the active window.
+    let hwnd = unsafe { GetForegroundWindow() };
+    let val = hwnd as isize;
+    if val == 0 {
+        None
+    } else {
+        Some(val)
+    }
+}
+
+#[cfg(windows)]
+pub fn restore_foreground(h: isize) {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{IsWindow, SetForegroundWindow};
+    let hwnd = h as _;
+    // SAFETY: IsWindow checks the window handle validity before SetForegroundWindow restores focus.
+    unsafe {
+        if IsWindow(hwnd) == 0 {
+            return;
+        }
+        if SetForegroundWindow(hwnd) == 0 {
+            log::warn!("SetForegroundWindow returned 0 for handle {}", h);
+        }
+    }
+}
+
+#[cfg(not(windows))]
+pub fn capture_foreground() -> Option<isize> {
+    None
+}
+
+#[cfg(not(windows))]
+pub fn restore_foreground(_h: isize) {}
+
 pub fn click_through_for_mode(expanded: bool) -> bool {
     !expanded
 }
