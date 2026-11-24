@@ -253,11 +253,10 @@ export default function Island() {
           /* COLLAPSED PILL: 168x40 inside 220x64 window                                */
           /* Status dot + "AURA" + aria-label from pill state                          */
           /* ========================================================================= */
-          <button
-            type="button"
-            onClick={() => handleExpand('chat')}
+          <div
+            role="status"
             aria-label={pillState}
-            className="w-full h-full flex items-center justify-center px-4 cursor-pointer outline-none bg-transparent hover:bg-white/5 transition-colors"
+            className="w-full h-full flex items-center justify-center px-4 bg-transparent transition-colors"
           >
             <div className="flex items-center space-x-2.5">
               <span
@@ -271,7 +270,7 @@ export default function Island() {
                 AURA
               </motion.span>
             </div>
-          </button>
+          </div>
         ) : (
           /* ========================================================================= */
           /* EXPANDED ISLAND: 560x380 inside 600x420 window                            */
