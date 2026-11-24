@@ -1,3 +1,4 @@
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
 use tauri::Manager;
 use tauri::{LogicalSize, PhysicalPosition, Position, Size};
@@ -13,7 +14,52 @@ pub const BLUR_GRACE: std::time::Duration = Duration::from_millis(400); // start
 pub struct IslandState {
     pub expanded: bool,
     pub expanded_at: Option<std::time::Instant>,
+    pub prev_foreground: Option<isize>,
 }
+
+pub fn restore_target(island_focused: bool, prev: Option<isize>) -> Option<isize> {
+    if island_focused {
+        prev
+    } else {
+        None
+    }
+}
+
+#[cfg(windows)]
+pub fn capture_foreground() -> Option<isize> {
+    use windows_sys::Win32::UI::WindowsAndMessaging::GetForegroundWindow;
+    // SAFETY: GetForegroundWindow has no preconditions and queries the system for the active window.
+    let hwnd = unsafe { GetForegroundWindow() };
+    let val = hwnd as isize;
+    if val == 0 {
+        None
+    } else {
+        Some(val)
+    }
+}
+
+#[cfg(windows)]
+pub fn restore_foreground(h: isize) {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{IsWindow, SetForegroundWindow};
+    let hwnd = h as _;
+    // SAFETY: IsWindow checks the window handle validity before SetForegroundWindow restores focus.
+    unsafe {
+        if IsWindow(hwnd) == 0 {
+            return;
+        }
+        if SetForegroundWindow(hwnd) == 0 {
+            log::warn!("SetForegroundWindow returned 0 for handle {}", h);
+        }
+    }
+}
+
+#[cfg(not(windows))]
+pub fn capture_foreground() -> Option<isize> {
+    None
+}
+
+#[cfg(not(windows))]
+pub fn restore_foreground(_h: isize) {}
 
 pub fn click_through_for_mode(expanded: bool) -> bool {
     !expanded
@@ -89,6 +135,12 @@ pub fn position_island(window: &tauri::WebviewWindow, expanded: bool) -> Result<
 pub fn apply_island_mode(window: &tauri::WebviewWindow, expanded: bool) -> Result<(), String> {
     position_island(window, expanded)?;
 
+    let island_focused = if !expanded {
+        window.is_focused().unwrap_or(false)
+    } else {
+        false
+    };
+
     if let Err(e) = window.set_ignore_cursor_events(click_through_for_mode(expanded)) {
         log::warn!("Failed to set ignore cursor events: {}", e);
     }
@@ -99,6 +151,21 @@ pub fn apply_island_mode(window: &tauri::WebviewWindow, expanded: bool) -> Resul
             log::warn!("Failed to set focus: {}", e);
             e.to_string()
         })?;
+    } else {
+        let state_mutex = window.app_handle().state::<Mutex<IslandState>>();
+        match state_mutex.lock() {
+            Ok(mut state) => {
+                let prev = state.prev_foreground;
+                if let Some(h) = restore_target(island_focused, prev) {
+                    restore_foreground(h);
+                    log::info!("restored focus to previous window");
+                }
+                state.prev_foreground = None;
+            }
+            Err(e) => {
+                log::warn!("Failed to lock IslandState on collapse: {}", e);
+            }
+        };
     }
 
     Ok(())
@@ -229,5 +296,20 @@ mod tests {
     #[test]
     fn test_blur_ignored_without_expand_time() {
         assert!(!should_collapse_on_blur(true, None, BLUR_GRACE));
+    }
+
+    #[test]
+    fn test_restore_when_focused_with_prev() {
+        assert_eq!(restore_target(true, Some(12345)), Some(12345));
+    }
+
+    #[test]
+    fn test_no_restore_when_not_focused() {
+        assert_eq!(restore_target(false, Some(12345)), None);
+    }
+
+    #[test]
+    fn test_no_restore_without_prev() {
+        assert_eq!(restore_target(true, None), None);
     }
 }

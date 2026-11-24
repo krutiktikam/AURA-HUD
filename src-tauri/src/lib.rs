@@ -91,6 +91,26 @@ pub fn run() {
                 .with_handler(|app, _shortcut, event| {
                     if event.state() == ShortcutState::Pressed {
                         log::info!("hotkey pressed");
+                        if let Some(main_win) = app.get_webview_window("main") {
+                            if let Ok(false) = main_win.is_focused() {
+                                let prev = island::capture_foreground();
+                                if let Some(state_mutex) =
+                                    app.try_state::<std::sync::Mutex<island::IslandState>>()
+                                {
+                                    match state_mutex.lock() {
+                                        Ok(mut state) => {
+                                            state.prev_foreground = prev;
+                                        }
+                                        Err(e) => {
+                                            log::warn!(
+                                                "Failed to lock IslandState on hotkey: {}",
+                                                e
+                                            );
+                                        }
+                                    }
+                                }
+                            }
+                        }
                         let _ = app.emit("island-toggle", ());
                     }
                 })
@@ -117,6 +137,18 @@ pub fn run() {
             let _tray = tray_builder
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "toggle" => {
+                        if let Some(state_mutex) =
+                            app.try_state::<std::sync::Mutex<island::IslandState>>()
+                        {
+                            match state_mutex.lock() {
+                                Ok(mut state) => {
+                                    state.prev_foreground = None;
+                                }
+                                Err(e) => {
+                                    log::warn!("Failed to lock IslandState on tray menu toggle: {}", e);
+                                }
+                            }
+                        }
                         let _ = app.emit("island-toggle", ());
                     }
                     "quit" => {
@@ -132,6 +164,18 @@ pub fn run() {
                     } = event
                     {
                         let app = tray.app_handle();
+                        if let Some(state_mutex) =
+                            app.try_state::<std::sync::Mutex<island::IslandState>>()
+                        {
+                            match state_mutex.lock() {
+                                Ok(mut state) => {
+                                    state.prev_foreground = None;
+                                }
+                                Err(e) => {
+                                    log::warn!("Failed to lock IslandState on tray click toggle: {}", e);
+                                }
+                            }
+                        }
                         let _ = app.emit("island-toggle", ());
                     }
                 })
