@@ -141,30 +141,39 @@ export default function Island() {
     }
   }, [isExpanded, handleCollapse, handleExpand]);
 
-  // Listen to Tauri "island-toggle" event (Tauri only)
+  // Listen to Tauri "island-toggle" and "island-blur" events (Tauri only)
   useEffect(() => {
     const isTauri =
       typeof window !== 'undefined' &&
       (Boolean(window.__TAURI_INTERNALS__) || Boolean(window.__TAURI__));
     if (!isTauri) return;
 
-    let unlisten = null;
+    let unlistenToggle = null;
+    let unlistenBlur = null;
     let isMounted = true;
 
     import('@tauri-apps/api/event')
-      .then(({ listen }) => {
+      .then(async ({ listen }) => {
         if (!isMounted) return;
-        return listen('island-toggle', () => {
+        const un1 = await listen('island-toggle', () => {
           if (!isMounted) return;
           handleToggle();
         });
-      })
-      .then((un) => {
         if (!isMounted) {
-          if (un) un();
-        } else {
-          unlisten = un;
+          if (un1) un1();
+          return;
         }
+        unlistenToggle = un1;
+
+        const un2 = await listen('island-blur', () => {
+          if (!isMounted) return;
+          handleCollapse();
+        });
+        if (!isMounted) {
+          if (un2) un2();
+          return;
+        }
+        unlistenBlur = un2;
       })
       .catch(() => {
         // Plain browser fallback
@@ -172,9 +181,10 @@ export default function Island() {
 
     return () => {
       isMounted = false;
-      if (unlisten) unlisten();
+      if (unlistenToggle) unlistenToggle();
+      if (unlistenBlur) unlistenBlur();
     };
-  }, [handleToggle]);
+  }, [handleToggle, handleCollapse]);
 
   // Esc key collapses
   useEffect(() => {
