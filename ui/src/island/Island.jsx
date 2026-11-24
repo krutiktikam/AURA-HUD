@@ -118,9 +118,9 @@ export default function Island() {
       if (isTransitioningRef.current || isExpanded) return;
       isTransitioningRef.current = true;
       if (tab) setActiveTab(tab);
-      await refreshClipboard();
       await safeInvoke('set_island_mode', { expanded: true });
       setIsExpanded(true);
+      refreshClipboard();
     },
     [isExpanded, refreshClipboard]
   );
