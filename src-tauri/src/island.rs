@@ -13,6 +13,15 @@ pub const BLUR_GRACE: std::time::Duration = Duration::from_millis(400); // start
 pub struct IslandState {
     pub expanded: bool,
     pub expanded_at: Option<std::time::Instant>,
+    pub prev_foreground: Option<isize>,
+}
+
+pub fn restore_target(island_focused: bool, prev: Option<isize>) -> Option<isize> {
+    if island_focused {
+        prev
+    } else {
+        None
+    }
 }
 
 pub fn click_through_for_mode(expanded: bool) -> bool {
@@ -229,5 +238,20 @@ mod tests {
     #[test]
     fn test_blur_ignored_without_expand_time() {
         assert!(!should_collapse_on_blur(true, None, BLUR_GRACE));
+    }
+
+    #[test]
+    fn test_restore_when_focused_with_prev() {
+        assert_eq!(restore_target(true, Some(12345)), Some(12345));
+    }
+
+    #[test]
+    fn test_no_restore_when_not_focused() {
+        assert_eq!(restore_target(false, Some(12345)), None);
+    }
+
+    #[test]
+    fn test_no_restore_without_prev() {
+        assert_eq!(restore_target(true, None), None);
     }
 }
