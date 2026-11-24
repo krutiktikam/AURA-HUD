@@ -85,10 +85,12 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_log::Builder::new().level(log::LevelFilter::Info).build())
+        .manage(std::sync::Mutex::new(island::IslandState::default()))
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, _shortcut, event| {
                     if event.state() == ShortcutState::Pressed {
+                        log::info!("hotkey pressed");
                         let _ = app.emit("island-toggle", ());
                     }
                 })
@@ -148,16 +150,41 @@ pub fn run() {
 
             // Position collapsed window at top center, then show it
             if let Some(window) = app.get_webview_window("main") {
-                let _ = island::position_island(&window, false);
+                let _ = island::apply_island_mode(&window, false);
                 let _ = window.show();
             }
 
             Ok(())
         })
-        .on_window_event(|_window, event| {
-            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+        .on_window_event(|window, event| match event {
+            tauri::WindowEvent::CloseRequested { api, .. } => {
                 api.prevent_close();
             }
+            tauri::WindowEvent::Focused(focused) => {
+                log::info!("window focus changed: {}", focused);
+                if !focused {
+                    if let Some(state_mutex) =
+                        window.app_handle().try_state::<std::sync::Mutex<island::IslandState>>()
+                    {
+                        match state_mutex.lock() {
+                            Ok(state) => {
+                                let since_expand = state.expanded_at.map(|t| t.elapsed());
+                                if island::should_collapse_on_blur(
+                                    state.expanded,
+                                    since_expand,
+                                    island::BLUR_GRACE,
+                                ) {
+                                    let _ = window.app_handle().emit("island-blur", ());
+                                }
+                            }
+                            Err(e) => {
+                                log::warn!("Failed to lock IslandState on blur: {}", e);
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {}
         })
         .invoke_handler(tauri::generate_handler![
             get_clipboard_text,

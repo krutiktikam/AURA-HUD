@@ -118,9 +118,9 @@ export default function Island() {
       if (isTransitioningRef.current || isExpanded) return;
       isTransitioningRef.current = true;
       if (tab) setActiveTab(tab);
-      await refreshClipboard();
       await safeInvoke('set_island_mode', { expanded: true });
       setIsExpanded(true);
+      refreshClipboard();
     },
     [isExpanded, refreshClipboard]
   );
@@ -141,30 +141,39 @@ export default function Island() {
     }
   }, [isExpanded, handleCollapse, handleExpand]);
 
-  // Listen to Tauri "island-toggle" event (Tauri only)
+  // Listen to Tauri "island-toggle" and "island-blur" events (Tauri only)
   useEffect(() => {
     const isTauri =
       typeof window !== 'undefined' &&
       (Boolean(window.__TAURI_INTERNALS__) || Boolean(window.__TAURI__));
     if (!isTauri) return;
 
-    let unlisten = null;
+    let unlistenToggle = null;
+    let unlistenBlur = null;
     let isMounted = true;
 
     import('@tauri-apps/api/event')
-      .then(({ listen }) => {
+      .then(async ({ listen }) => {
         if (!isMounted) return;
-        return listen('island-toggle', () => {
+        const un1 = await listen('island-toggle', () => {
           if (!isMounted) return;
           handleToggle();
         });
-      })
-      .then((un) => {
         if (!isMounted) {
-          if (un) un();
-        } else {
-          unlisten = un;
+          if (un1) un1();
+          return;
         }
+        unlistenToggle = un1;
+
+        const un2 = await listen('island-blur', () => {
+          if (!isMounted) return;
+          handleCollapse();
+        });
+        if (!isMounted) {
+          if (un2) un2();
+          return;
+        }
+        unlistenBlur = un2;
       })
       .catch(() => {
         // Plain browser fallback
@@ -172,9 +181,10 @@ export default function Island() {
 
     return () => {
       isMounted = false;
-      if (unlisten) unlisten();
+      if (unlistenToggle) unlistenToggle();
+      if (unlistenBlur) unlistenBlur();
     };
-  }, [handleToggle]);
+  }, [handleToggle, handleCollapse]);
 
   // Esc key collapses
   useEffect(() => {
@@ -243,11 +253,10 @@ export default function Island() {
           /* COLLAPSED PILL: 168x40 inside 220x64 window                                */
           /* Status dot + "AURA" + aria-label from pill state                          */
           /* ========================================================================= */
-          <button
-            type="button"
-            onClick={() => handleExpand('chat')}
+          <div
+            role="status"
             aria-label={pillState}
-            className="w-full h-full flex items-center justify-center px-4 cursor-pointer outline-none bg-transparent hover:bg-white/5 transition-colors"
+            className="w-full h-full flex items-center justify-center px-4 bg-transparent transition-colors"
           >
             <div className="flex items-center space-x-2.5">
               <span
@@ -261,7 +270,7 @@ export default function Island() {
                 AURA
               </motion.span>
             </div>
-          </button>
+          </div>
         ) : (
           /* ========================================================================= */
           /* EXPANDED ISLAND: 560x380 inside 600x420 window                            */

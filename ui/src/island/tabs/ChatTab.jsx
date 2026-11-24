@@ -12,6 +12,22 @@ export default function ChatTab({
 }) {
   const [inputText, setInputText] = useState('');
   const messagesEndRef = useRef(null);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+
+    const handleFocus = () => {
+      if (!document.activeElement || document.activeElement === document.body) {
+        inputRef.current?.focus();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -100,6 +116,7 @@ export default function ChatTab({
       {/* Input Form (NO MIC BUTTON) */}
       <form onSubmit={handleSubmit} className="flex items-center space-x-2 shrink-0">
         <input
+          ref={inputRef}
           type="text"
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}

@@ -1,3 +1,4 @@
+use std::time::{Duration, Instant};
 use tauri::Manager;
 use tauri::{LogicalSize, PhysicalPosition, Position, Size};
 
@@ -5,6 +6,26 @@ use tauri::{LogicalSize, PhysicalPosition, Position, Size};
 pub const COLLAPSED: (f64, f64) = (220.0, 64.0);
 pub const EXPANDED: (f64, f64) = (600.0, 420.0);
 pub const TOP_MARGIN: f64 = 12.0;
+
+pub const BLUR_GRACE: std::time::Duration = Duration::from_millis(400); // starting default, not tuned
+
+#[derive(Default)]
+pub struct IslandState {
+    pub expanded: bool,
+    pub expanded_at: Option<std::time::Instant>,
+}
+
+pub fn click_through_for_mode(expanded: bool) -> bool {
+    !expanded
+}
+
+pub fn should_collapse_on_blur(
+    expanded: bool,
+    since_expand: Option<std::time::Duration>,
+    grace: std::time::Duration,
+) -> bool {
+    expanded && since_expand.is_some_and(|d| d >= grace)
+}
 
 /// Calculates the physical top-left position for the island window on a monitor.
 /// Returns (x, y) physical coordinates:
@@ -64,19 +85,50 @@ pub fn position_island(window: &tauri::WebviewWindow, expanded: bool) -> Result<
     Ok(())
 }
 
+/// Applies island position, click-through, and on expand shows and focuses the window.
+pub fn apply_island_mode(window: &tauri::WebviewWindow, expanded: bool) -> Result<(), String> {
+    position_island(window, expanded)?;
+
+    if let Err(e) = window.set_ignore_cursor_events(click_through_for_mode(expanded)) {
+        log::warn!("Failed to set ignore cursor events: {}", e);
+    }
+
+    if expanded {
+        window.show().map_err(|e| e.to_string())?;
+        window.set_focus().map_err(|e| {
+            log::warn!("Failed to set focus: {}", e);
+            e.to_string()
+        })?;
+    }
+
+    Ok(())
+}
+
 /// Sizes the main window to COLLAPSED or EXPANDED, positions it on the primary monitor
 /// (fallback: current monitor), and on expand also shows and focuses the window.
 #[tauri::command]
 pub fn set_island_mode(app: tauri::AppHandle, expanded: bool) -> Result<(), String> {
+    log::info!("set_island_mode expanded={}", expanded);
     let window = app
         .get_webview_window("main")
         .ok_or_else(|| "Main window not found".to_string())?;
 
-    position_island(&window, expanded)?;
+    apply_island_mode(&window, expanded)?;
 
-    if expanded {
-        window.show().map_err(|e| e.to_string())?;
-        window.set_focus().map_err(|e| e.to_string())?;
+    if let Some(state_mutex) = app.try_state::<std::sync::Mutex<IslandState>>() {
+        match state_mutex.lock() {
+            Ok(mut state) => {
+                state.expanded = expanded;
+                state.expanded_at = if expanded {
+                    Some(Instant::now())
+                } else {
+                    None
+                };
+            }
+            Err(e) => {
+                log::warn!("Failed to lock IslandState in set_island_mode: {}", e);
+            }
+        }
     }
 
     Ok(())
@@ -130,5 +182,52 @@ mod tests {
         // Monitor width 500, window width 600 -> offset negative, clamped to mon_x
         let pos = island_position((100, 50), (500, 900), 1.0, EXPANDED, TOP_MARGIN);
         assert_eq!(pos, (100, 62));
+    }
+
+    #[test]
+    fn test_click_through_when_collapsed() {
+        assert!(click_through_for_mode(false));
+    }
+
+    #[test]
+    fn test_no_click_through_when_expanded() {
+        assert!(!click_through_for_mode(true));
+    }
+
+    #[test]
+    fn test_blur_ignored_when_collapsed() {
+        assert!(!should_collapse_on_blur(
+            false,
+            Some(Duration::from_millis(500)),
+            BLUR_GRACE
+        ));
+    }
+
+    #[test]
+    fn test_blur_ignored_within_grace() {
+        assert!(!should_collapse_on_blur(
+            true,
+            Some(Duration::from_millis(200)),
+            BLUR_GRACE
+        ));
+    }
+
+    #[test]
+    fn test_blur_collapses_after_grace() {
+        assert!(should_collapse_on_blur(
+            true,
+            Some(Duration::from_millis(400)),
+            BLUR_GRACE
+        ));
+        assert!(should_collapse_on_blur(
+            true,
+            Some(Duration::from_millis(500)),
+            BLUR_GRACE
+        ));
+    }
+
+    #[test]
+    fn test_blur_ignored_without_expand_time() {
+        assert!(!should_collapse_on_blur(true, None, BLUR_GRACE));
     }
 }
