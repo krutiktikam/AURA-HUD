@@ -1,3 +1,4 @@
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
 use tauri::Manager;
 use tauri::{LogicalSize, PhysicalPosition, Position, Size};
@@ -134,6 +135,12 @@ pub fn position_island(window: &tauri::WebviewWindow, expanded: bool) -> Result<
 pub fn apply_island_mode(window: &tauri::WebviewWindow, expanded: bool) -> Result<(), String> {
     position_island(window, expanded)?;
 
+    let island_focused = if !expanded {
+        window.is_focused().unwrap_or(false)
+    } else {
+        false
+    };
+
     if let Err(e) = window.set_ignore_cursor_events(click_through_for_mode(expanded)) {
         log::warn!("Failed to set ignore cursor events: {}", e);
     }
@@ -144,6 +151,21 @@ pub fn apply_island_mode(window: &tauri::WebviewWindow, expanded: bool) -> Resul
             log::warn!("Failed to set focus: {}", e);
             e.to_string()
         })?;
+    } else {
+        let state_mutex = window.app_handle().state::<Mutex<IslandState>>();
+        match state_mutex.lock() {
+            Ok(mut state) => {
+                let prev = state.prev_foreground;
+                if let Some(h) = restore_target(island_focused, prev) {
+                    restore_foreground(h);
+                    log::info!("restored focus to previous window");
+                }
+                state.prev_foreground = None;
+            }
+            Err(e) => {
+                log::warn!("Failed to lock IslandState on collapse: {}", e);
+            }
+        };
     }
 
     Ok(())
