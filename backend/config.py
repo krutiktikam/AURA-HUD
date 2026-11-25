@@ -62,6 +62,9 @@ class Settings(BaseSettings):
     
     # Clipboard Settings
     CLIPBOARD_DB_PATH: Optional[str] = None
+    # Clipboard privacy limits are starting defaults, not tuned
+    CLIPBOARD_MAX_CHARS: int = 10000
+    CLIPBOARD_RETENTION_DAYS: int = 30
 
     # API & WebSocket Settings
     CORS_ORIGINS: List[str] = [
