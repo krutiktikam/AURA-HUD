@@ -1,4 +1,6 @@
 """SQLite WAL Clipboard History Storage Engine."""
+import json
+import re
 import sqlite3
 import time
 from contextlib import closing
@@ -6,6 +8,11 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from backend.config import get_default_clipboard_db_path, settings
+
+_CODE_KEYWORD_RE = re.compile(
+    r"^\s*(def|class|import|from|const|let|var|function|public|private|fn|SELECT|#include)\b",
+    re.MULTILINE,
+)
 
 
 def get_db_path() -> Path:
@@ -123,13 +130,26 @@ def detect_category(content: str) -> str:
     s = content.strip()
     if s.startswith(("http://", "https://", "www.")):
         return "url"
-    if (s.startswith("{") and s.endswith("}")) or (s.startswith("[") and s.endswith("]")):
-        return "json"
-    code_keywords = [
-        "def ", "const ", "let ", "var ", "function ", "class ",
-        "import ", "return ", "=>", "SELECT ", "public ", "fn ",
-    ]
-    if any(k in s for k in code_keywords) or ("\n" in s and ("{" in s or ";" in s)):
+
+    try:
+        parsed = json.loads(s)
+        if isinstance(parsed, (dict, list)):
+            return "json"
+    except (ValueError, TypeError):
+        pass
+
+    lines = s.splitlines()
+    signals = (
+        bool(_CODE_KEYWORD_RE.search(s)),
+        "=>" in s,
+        any(line.rstrip().endswith(";") for line in lines),
+        any(
+            (stripped := line.strip()) in ("{", "}") or stripped.endswith("{")
+            for line in lines
+        ),
+        "```" in s,
+    )
+    if sum(signals) >= 2:
         return "code"
     return "text"
 
