@@ -35,6 +35,74 @@ def init_db(db_path: Optional[Path] = None) -> None:
                 "CREATE INDEX IF NOT EXISTS idx_clipboard_timestamp "
                 "ON clipboard_history(timestamp DESC);"
             )
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS clipboard_settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                );
+            """)
+
+
+def get_settings(db_path: Optional[Path] = None) -> Dict[str, Any]:
+    """Return persisted clipboard privacy settings with default fallbacks."""
+    path = db_path or get_db_path()
+    paused = False
+    retention_days = settings.CLIPBOARD_RETENTION_DAYS
+
+    if not path.exists():
+        return {"paused": paused, "retention_days": retention_days}
+
+    with closing(sqlite3.connect(path)) as conn:
+        table_exists = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='clipboard_settings';"
+        ).fetchone()
+        if table_exists is None:
+            return {"paused": paused, "retention_days": retention_days}
+
+        rows = conn.execute("SELECT key, value FROM clipboard_settings;").fetchall()
+        for key, value in rows:
+            if key == "paused":
+                paused = value.lower() in ("1", "true", "yes")
+            elif key == "retention_days":
+                try:
+                    parsed = int(value)
+                    if 1 <= parsed <= 365:
+                        retention_days = parsed
+                except ValueError:
+                    pass
+
+    return {"paused": paused, "retention_days": retention_days}
+
+
+def set_settings(
+    paused: Optional[bool] = None,
+    retention_days: Optional[int] = None,
+    db_path: Optional[Path] = None,
+) -> Dict[str, Any]:
+    """Persist clipboard privacy settings and return the updated settings."""
+    if retention_days is not None:
+        if isinstance(retention_days, bool) or not (1 <= retention_days <= 365):
+            raise ValueError("retention_days must be between 1 and 365")
+
+    path = db_path or get_db_path()
+    init_db(db_path=path)
+
+    updates = []
+    if paused is not None:
+        updates.append(("paused", "true" if paused else "false"))
+    if retention_days is not None:
+        updates.append(("retention_days", str(retention_days)))
+
+    if updates:
+        with closing(sqlite3.connect(path)) as conn:
+            with conn:
+                conn.executemany(
+                    "INSERT INTO clipboard_settings (key, value) VALUES (?, ?) "
+                    "ON CONFLICT(key) DO UPDATE SET value = excluded.value;",
+                    updates,
+                )
+
+    return get_settings(db_path=path)
 
 
 def db_ok(db_path: Optional[Path] = None) -> bool:
@@ -70,14 +138,20 @@ def add_clipboard_entry(
     content: str, category: Optional[str] = None, db_path: Optional[Path] = None
 ) -> Dict[str, Any]:
     """Add a new entry to the clipboard history, avoiding consecutive duplicates."""
+    path = db_path or get_db_path()
+    if get_settings(db_path=path)["paused"]:
+        return {"status": "paused"}
+
     clean_text = content.strip()
     if not clean_text:
         return {"status": "empty"}
 
+    if len(clean_text) > settings.CLIPBOARD_MAX_CHARS:
+        return {"status": "too_large"}
+
     if category is None:
         category = detect_category(clean_text)
 
-    path = db_path or get_db_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     with closing(sqlite3.connect(path)) as conn:
         with conn:
