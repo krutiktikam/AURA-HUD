@@ -218,9 +218,10 @@ export default function Island() {
     await safeInvoke('quit_app');
   };
 
+  // starting default, tuned by eye, not measured
   const transitionConfig = shouldReduceMotion
     ? { duration: 0 }
-    : { type: 'spring', stiffness: 380, damping: 30 };
+    : { type: 'spring', stiffness: 380, damping: 36 };
 
   const statusColor = STATUS_COLORS[pillState] || STATUS_COLORS.unknown;
   const actionChips = clipboardContent
@@ -228,18 +229,21 @@ export default function Island() {
     : [];
 
   return (
-    <div className="w-full h-full flex items-center justify-center bg-transparent select-none p-0 overflow-hidden font-sans">
+    // collapsed window is 64 logical px tall = 12 + 40 + 12; the island is top-anchored so window resizes cause no visible jump
+    <div
+      className="w-full h-full flex items-start justify-center bg-transparent select-none p-0 overflow-hidden font-sans"
+      style={{ paddingTop: 12 }}
+    >
       <motion.div
-        layout
         initial={false}
         animate={{
           width: isExpanded ? 560 : 168,
           height: isExpanded ? 380 : 40,
+          borderRadius: isExpanded ? 28 : 20,
         }}
         transition={transitionConfig}
         onAnimationComplete={handleAnimationComplete}
         style={{
-          borderRadius: isExpanded ? 28 : 20,
           backgroundColor: 'rgba(22, 22, 22, 0.97)',
           border: '1px solid rgba(255, 255, 255, 0.1)',
           boxSizing: 'border-box',
@@ -248,119 +252,139 @@ export default function Island() {
         }}
         className="relative flex flex-col shadow-2xl"
       >
-        {!isExpanded ? (
-          /* ========================================================================= */
-          /* COLLAPSED PILL: 168x40 inside 220x64 window                                */
-          /* Status dot + "AURA" + aria-label from pill state                          */
-          /* ========================================================================= */
-          <div
-            role="status"
-            aria-label={pillState}
-            className="w-full h-full flex items-center justify-center px-4 bg-transparent transition-colors"
-          >
-            <div className="flex items-center space-x-2.5">
-              <span
-                style={{ backgroundColor: statusColor }}
-                className="w-2.5 h-2.5 rounded-full inline-block shrink-0"
-              />
-              <motion.span
-                layout="position"
-                className="font-semibold tracking-wider text-xs text-[#e8ecef] select-none"
+        <AnimatePresence initial={false} mode="popLayout">
+          {!isExpanded ? (
+            <motion.div
+              key="pill"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.12 }}
+              className="w-full h-full"
+            >
+              {/* ========================================================================= */}
+              {/* COLLAPSED PILL: 168x40 inside 220x64 window                                */}
+              {/* Status dot + "AURA" + aria-label from pill state                          */ }
+              {/* ========================================================================= */}
+              <div
+                role="status"
+                aria-label={pillState}
+                className="w-full h-full flex items-center justify-center px-4 bg-transparent transition-colors"
               >
-                AURA
-              </motion.span>
-            </div>
-          </div>
-        ) : (
-          /* ========================================================================= */
-          /* EXPANDED ISLAND: 560x380 inside 600x420 window                            */
-          /* Tabs: Chat, Clipboard, Stats, Controls                                    */
-          /* ========================================================================= */
-          <div className="w-full h-full flex flex-col min-h-0">
-            {/* Top Navigation Bar */}
-            <div className="flex items-center justify-between px-3 pt-2.5 pb-1 border-b border-white/10 shrink-0">
-              <div className="flex items-center space-x-1">
-                {['chat', 'clipboard', 'stats', 'controls'].map((tab) => {
-                  const isActive = activeTab === tab;
-                  const label = tab.charAt(0).toUpperCase() + tab.slice(1);
-                  return (
+                <div className="flex items-center space-x-2.5">
+                  <span
+                    style={{ backgroundColor: statusColor }}
+                    className="w-2.5 h-2.5 rounded-full inline-block shrink-0"
+                  />
+                  <motion.span
+                    layout="position"
+                    className="font-semibold tracking-wider text-xs text-[#e8ecef] select-none"
+                  >
+                    AURA
+                  </motion.span>
+                </div>
+              </div>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="expanded"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.12 }}
+              className="w-full h-full"
+            >
+              {/* ========================================================================= */}
+              {/* EXPANDED ISLAND: 560x380 inside 600x420 window                            */}
+              {/* Tabs: Chat, Clipboard, Stats, Controls                                    */}
+              {/* ========================================================================= */}
+              <div className="w-full h-full flex flex-col min-h-0">
+                {/* Top Navigation Bar */}
+                <div className="flex items-center justify-between px-3 pt-2.5 pb-1 border-b border-white/10 shrink-0">
+                  <div className="flex items-center space-x-1">
+                    {['chat', 'clipboard', 'stats', 'controls'].map((tab) => {
+                      const isActive = activeTab === tab;
+                      const label = tab.charAt(0).toUpperCase() + tab.slice(1);
+                      return (
+                        <button
+                          key={tab}
+                          type="button"
+                          onClick={() => setActiveTab(tab)}
+                          className={`min-h-[44px] px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer outline-none transition-colors ${
+                            isActive
+                              ? 'text-[#a3e635] bg-white/10'
+                              : 'text-[#9aa3ad] hover:text-[#e8ecef] hover:bg-white/5'
+                          }`}
+                        >
+                          <motion.span layout="position">{label}</motion.span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Status pill & collapse toggle */}
+                  <div className="flex items-center space-x-2">
+                    <span
+                      style={{ backgroundColor: statusColor }}
+                      title={`Status: ${pillState}`}
+                      className="w-2 h-2 rounded-full inline-block"
+                    />
                     <button
-                      key={tab}
                       type="button"
-                      onClick={() => setActiveTab(tab)}
-                      className={`min-h-[44px] px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer outline-none transition-colors ${
-                        isActive
-                          ? 'text-[#a3e635] bg-white/10'
-                          : 'text-[#9aa3ad] hover:text-[#e8ecef] hover:bg-white/5'
-                      }`}
+                      onClick={handleCollapse}
+                      aria-label="Collapse"
+                      className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-[#9aa3ad] hover:text-[#e8ecef] hover:bg-white/5 cursor-pointer text-xs"
                     >
-                      <motion.span layout="position">{label}</motion.span>
+                      ✕
                     </button>
-                  );
-                })}
-              </div>
+                  </div>
+                </div>
 
-              {/* Status pill & collapse toggle */}
-              <div className="flex items-center space-x-2">
-                <span
-                  style={{ backgroundColor: statusColor }}
-                  title={`Status: ${pillState}`}
-                  className="w-2 h-2 rounded-full inline-block"
-                />
-                <button
-                  type="button"
-                  onClick={handleCollapse}
-                  aria-label="Collapse"
-                  className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-[#9aa3ad] hover:text-[#e8ecef] hover:bg-white/5 cursor-pointer text-xs"
-                >
-                  ✕
-                </button>
+                {/* Tab Body */}
+                <div className="flex-1 min-h-0 overflow-hidden flex flex-col p-3">
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      key={activeTab}
+                      initial={shouldReduceMotion ? false : { opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={shouldReduceMotion ? undefined : { opacity: 0, y: -6 }}
+                      transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.15 }}
+                      className="w-full h-full flex flex-col min-h-0"
+                    >
+                      {activeTab === 'chat' && (
+                        <ChatTab
+                          messages={messages}
+                          isThinking={isThinking}
+                          send={send}
+                          error={error}
+                          clipboardContent={clipboardContent}
+                          actionChips={actionChips}
+                          onActionClick={handleActionChipClick}
+                        />
+                      )}
+                      {activeTab === 'clipboard' && (
+                        <ClipboardTab
+                          clipboardContent={clipboardContent}
+                          actionChips={actionChips}
+                          onActionClick={handleActionChipClick}
+                        />
+                      )}
+                      {activeTab === 'stats' && <StatsTab />}
+                      {activeTab === 'controls' && (
+                        <ControlsTab
+                          voiceRepliesEnabled={voiceRepliesEnabled}
+                          onToggleVoiceReplies={setVoiceRepliesEnabled}
+                          hasLocalVoices={localVoices.length > 0}
+                          onQuitApp={handleQuitApp}
+                        />
+                      )}
+                    </motion.div>
+                  </AnimatePresence>
+                </div>
               </div>
-            </div>
-
-            {/* Tab Body */}
-            <div className="flex-1 min-h-0 overflow-hidden flex flex-col p-3">
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={activeTab}
-                  initial={shouldReduceMotion ? false : { opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={shouldReduceMotion ? undefined : { opacity: 0, y: -6 }}
-                  transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.15 }}
-                  className="w-full h-full flex flex-col min-h-0"
-                >
-                  {activeTab === 'chat' && (
-                    <ChatTab
-                      messages={messages}
-                      isThinking={isThinking}
-                      send={send}
-                      error={error}
-                      clipboardContent={clipboardContent}
-                      actionChips={actionChips}
-                      onActionClick={handleActionChipClick}
-                    />
-                  )}
-                  {activeTab === 'clipboard' && (
-                    <ClipboardTab
-                      clipboardContent={clipboardContent}
-                      actionChips={actionChips}
-                      onActionClick={handleActionChipClick}
-                    />
-                  )}
-                  {activeTab === 'stats' && <StatsTab />}
-                  {activeTab === 'controls' && (
-                    <ControlsTab
-                      voiceRepliesEnabled={voiceRepliesEnabled}
-                      onToggleVoiceReplies={setVoiceRepliesEnabled}
-                      hasLocalVoices={localVoices.length > 0}
-                      onQuitApp={handleQuitApp}
-                    />
-                  )}
-                </motion.div>
-              </AnimatePresence>
-            </div>
-          </div>
-        )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.div>
     </div>
   );
