@@ -166,7 +166,55 @@ def add_clipboard_entry(
                 "INSERT INTO clipboard_history (content, category, timestamp) VALUES (?, ?, ?);",
                 (clean_text, category, time.time()),
             )
+    purge_expired(db_path=path)
     return {"status": "saved", "category": category}
+
+
+def _secure_delete(path: Path, sql: str, params: tuple = ()) -> int:
+    """Execute a delete on clipboard_history with secure_delete and WAL checkpointing."""
+    if not path.exists():
+        return 0
+
+    with closing(sqlite3.connect(path)) as conn:
+        table_exists = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='clipboard_history';"
+        ).fetchone()
+        if table_exists is None:
+            return 0
+
+        conn.execute("PRAGMA secure_delete=ON;")
+        with conn:
+            cursor = conn.execute(sql, params)
+            deleted = cursor.rowcount
+        conn.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+        return deleted
+
+
+def purge_expired(
+    retention_days: Optional[int] = None,
+    now: Optional[float] = None,
+    db_path: Optional[Path] = None,
+) -> int:
+    """Delete clipboard entries older than retention_days and scrub freed space."""
+    path = db_path or get_db_path()
+    days = (
+        retention_days
+        if retention_days is not None
+        else get_settings(db_path=path)["retention_days"]
+    )
+    current_time = time.time() if now is None else now
+    cutoff = current_time - (days * 86400)
+    return _secure_delete(
+        path,
+        "DELETE FROM clipboard_history WHERE timestamp < ?;",
+        (cutoff,),
+    )
+
+
+def clear_history(db_path: Optional[Path] = None) -> int:
+    """Delete all clipboard history entries and scrub freed space."""
+    path = db_path or get_db_path()
+    return _secure_delete(path, "DELETE FROM clipboard_history;")
 
 
 def get_recent_history(
