@@ -218,9 +218,10 @@ export default function Island() {
     await safeInvoke('quit_app');
   };
 
+  // starting default, tuned by eye, not measured
   const transitionConfig = shouldReduceMotion
     ? { duration: 0 }
-    : { type: 'spring', stiffness: 380, damping: 30 };
+    : { type: 'spring', stiffness: 380, damping: 36 };
 
   const statusColor = STATUS_COLORS[pillState] || STATUS_COLORS.unknown;
   const actionChips = clipboardContent
