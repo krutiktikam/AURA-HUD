@@ -228,7 +228,11 @@ export default function Island() {
     : [];
 
   return (
-    <div className="w-full h-full flex items-center justify-center bg-transparent select-none p-0 overflow-hidden font-sans">
+    // collapsed window is 64 logical px tall = 12 + 40 + 12; the island is top-anchored so window resizes cause no visible jump
+    <div
+      className="w-full h-full flex items-start justify-center bg-transparent select-none p-0 overflow-hidden font-sans"
+      style={{ paddingTop: 12 }}
+    >
       <motion.div
         layout
         initial={false}
