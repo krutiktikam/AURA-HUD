@@ -234,16 +234,15 @@ export default function Island() {
       style={{ paddingTop: 12 }}
     >
       <motion.div
-        layout
         initial={false}
         animate={{
           width: isExpanded ? 560 : 168,
           height: isExpanded ? 380 : 40,
+          borderRadius: isExpanded ? 28 : 20,
         }}
         transition={transitionConfig}
         onAnimationComplete={handleAnimationComplete}
         style={{
-          borderRadius: isExpanded ? 28 : 20,
           backgroundColor: 'rgba(22, 22, 22, 0.97)',
           border: '1px solid rgba(255, 255, 255, 0.1)',
           boxSizing: 'border-box',
