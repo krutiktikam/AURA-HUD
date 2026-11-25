@@ -16,7 +16,7 @@ import json
 import logging
 import time
 from contextlib import asynccontextmanager
-from typing import List, Mapping, Optional
+from typing import List, Literal, Mapping, Optional
 
 import httpx
 import psutil
@@ -24,21 +24,26 @@ from fastapi import (
     Depends,
     FastAPI,
     HTTPException,
+    Query,
     Request,
     WebSocket,
     WebSocketDisconnect,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from backend.agent.router import router as agent_router
 from backend.clipboard_store import (
     add_clipboard_entry,
+    clear_history,
     db_ok,
     get_recent_history,
+    get_settings,
     init_db,
+    purge_expired,
     search_history,
+    set_settings,
 )
 from backend.config import settings
 from backend.security import (
@@ -70,6 +75,7 @@ async def lifespan(app: FastAPI):
     # Initialize SQLite database schema
 
     init_db()
+    purge_expired()
 
     # Initialize shared OllamaClient
 
@@ -255,7 +261,7 @@ async def get_system_telemetry():
 
 @app.get("/api/clipboard/history", dependencies=[Depends(require_token)])
 
-async def get_clipboard_history(limit: int = 15):
+async def get_clipboard_history(limit: int = Query(15, ge=1, le=100)):
 
     """Get recent clipboard entries from SQLite WAL."""
 
@@ -269,7 +275,7 @@ class ClipboardAddRequest(BaseModel):
 
     content: str
 
-    category: Optional[str] = None
+    category: Optional[Literal["text", "code", "json", "url"]] = None
 
 
 
@@ -291,11 +297,58 @@ async def add_clipboard(req: ClipboardAddRequest):
 
 @app.get("/api/clipboard/search", dependencies=[Depends(require_token)])
 
-async def search_clipboard(q: str = "", limit: int = 5):
+async def search_clipboard(
+    q: str = Query("", max_length=200),
+    limit: int = Query(5, ge=1, le=50),
+):
 
     """Search clipboard history for a query term."""
 
     return {"results": search_history(q, limit=limit)}
+
+
+class ClipboardSettingsRequest(BaseModel):
+
+    paused: Optional[bool] = None
+
+    retention_days: Optional[int] = Field(default=None, ge=1, le=365)
+
+
+def _clipboard_settings_payload(current: Mapping[str, object]) -> dict:
+    return {
+        "paused": current["paused"],
+        "retention_days": current["retention_days"],
+        "max_chars": settings.CLIPBOARD_MAX_CHARS,
+    }
+
+
+@app.get("/api/clipboard/settings", dependencies=[Depends(require_token)])
+
+async def get_clipboard_settings():
+
+    """Return current clipboard privacy settings."""
+
+    return _clipboard_settings_payload(get_settings())
+
+
+@app.post("/api/clipboard/settings", dependencies=[Depends(require_token)])
+
+async def update_clipboard_settings(req: ClipboardSettingsRequest):
+
+    """Update clipboard privacy settings."""
+
+    updated = set_settings(paused=req.paused, retention_days=req.retention_days)
+    return _clipboard_settings_payload(updated)
+
+
+@app.post("/api/clipboard/clear", dependencies=[Depends(require_token)])
+
+async def clear_clipboard():
+
+    """Clear all clipboard history entries."""
+
+    deleted = clear_history()
+    return {"status": "cleared", "deleted": deleted}
 
 
 
