@@ -13,6 +13,7 @@ _CODE_KEYWORD_RE = re.compile(
     r"^\s*(def|class|import|from|const|let|var|function|public|private|fn|SELECT|#include)\b",
     re.MULTILINE,
 )
+_CALL_SHAPE_RE = re.compile(r"\b\w+\s*\([^)]*\)\s*(:|\{)")
 
 
 def get_db_path() -> Path:
@@ -148,6 +149,7 @@ def detect_category(content: str) -> str:
             for line in lines
         ),
         "```" in s,
+        bool(_CALL_SHAPE_RE.search(s)),
     )
     if sum(signals) >= 2:
         return "code"

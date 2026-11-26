@@ -254,8 +254,11 @@ def test_unknown_category_rejected(client: TestClient):
     "sample",
     [
         "let me know if you need anything else today.",
+        "let me know if that works",
         "Please return the signed agreement before noon.",
+        "Please return the book and import the files",
         "We plan to import new parts next week.",
+        "From the evidence file, run the script",
         (
             "When you return to the office, please let me know so we can "
             "review the import schedule together. The team will discuss every "
@@ -278,6 +281,10 @@ def test_detect_category_prose_is_text(sample: str):
         ('{"key": "value", "items": [1, 2]}', "json"),
         ('[1, 2, {"ok": true}]', "json"),
         ("const total = 42;", "code"),
+        ("def add(a, b): return a + b", "code"),
+        ("const x = () => 1;", "code"),
+        ("SELECT * FROM users;", "code"),
+        ("function f(x) { return x; }", "code"),
         ("function greet(name) {\n  return name;\n}", "code"),
         ("const handler = (x) => {\n  return x + 1;\n};", "code"),
         ("```python\ndef run():\n    pass\n```", "code"),
