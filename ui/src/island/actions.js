@@ -34,16 +34,6 @@ export const CATEGORY_ACTIONS = {
   ],
 };
 
-export function categorizeClipboard(text) {
-  if (!text) return 'text';
-  const s = text.trim();
-  if (s.startsWith('http://') || s.startsWith('https://')) return 'url';
-  if ((s.startsWith('{') && s.endsWith('}')) || (s.startsWith('[') && s.endsWith(']'))) return 'json';
-  const codeKeywords = ['def ', 'const ', 'let ', 'var ', 'function ', 'class ', 'import ', 'return ', '=>', 'SELECT ', 'fn '];
-  if (codeKeywords.some((k) => s.includes(k)) || (s.includes('\n') && (s.includes('{') || s.includes(';')))) return 'code';
-  return 'text';
-}
-
 export function getActionsForCategory(category) {
   return CATEGORY_ACTIONS[category] || CATEGORY_ACTIONS.text;
 }

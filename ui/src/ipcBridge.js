@@ -30,15 +30,54 @@ export const desktopAPI = {
   checkBackendHealth: () => apiFetch(`${API_BASE}/api/health`).then((r) => r.json()),
 
   syncClipboardToBackend: async (content, category = null) => {
-    if (!content || !content.trim()) return;
+    if (!content || !content.trim()) return { status: 'empty' };
     try {
-      await apiFetch(`${API_BASE}/api/clipboard/add`, {
+      const response = await apiFetch(`${API_BASE}/api/clipboard/add`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: content.trim(), category }),
       });
+      if (!response.ok) return { status: 'error' };
+      return await response.json();
     } catch {
-      // Background sync, ignore network errors
+      return { status: 'error' };
+    }
+  },
+
+  getClipboardSettings: async () => {
+    try {
+      const response = await apiFetch(`${API_BASE}/api/clipboard/settings`);
+      if (!response.ok) return null;
+      return await response.json();
+    } catch {
+      return null;
+    }
+  },
+
+  setClipboardPaused: async (paused) => {
+    try {
+      const response = await apiFetch(`${API_BASE}/api/clipboard/settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paused: Boolean(paused) }),
+      });
+      if (!response.ok) return null;
+      return await response.json();
+    } catch {
+      return null;
+    }
+  },
+
+  clearClipboardHistory: async () => {
+    try {
+      const response = await apiFetch(`${API_BASE}/api/clipboard/clear`, {
+        method: 'POST',
+      });
+      if (!response.ok) return null;
+      const data = await response.json();
+      return typeof data?.deleted === 'number' ? data.deleted : null;
+    } catch {
+      return null;
     }
   },
 };

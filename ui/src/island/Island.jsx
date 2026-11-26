@@ -2,11 +2,15 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { useBackendStatus } from '../hooks/useBackendStatus';
 import { useChatSocket } from '../hooks/useChatSocket';
-import { categorizeClipboard, getActionsForCategory } from './actions';
+import { desktopAPI } from '../ipcBridge';
+import { getActionsForCategory } from './actions';
 import ChatTab from './tabs/ChatTab';
 import ClipboardTab from './tabs/ClipboardTab';
 import StatsTab from './tabs/StatsTab';
 import ControlsTab from './tabs/ControlsTab';
+
+// Guard against huge payloads, not a policy
+const MAX_SYNC_CHARS = 50000;
 
 const STATUS_COLORS = {
   ready: '#a3e635',
@@ -36,10 +40,12 @@ export default function Island() {
   const [isExpanded, setIsExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState('chat');
   const [clipboardContent, setClipboardContent] = useState(null);
+  const [captureStatus, setCaptureStatus] = useState(null);
   const [voiceRepliesEnabled, setVoiceRepliesEnabled] = useState(false);
   const [localVoices, setLocalVoices] = useState([]);
 
   const isTransitioningRef = useRef(false);
+  const suppressedRef = useRef(null);
   const shouldReduceMotion = useReducedMotion();
 
   // Detect and filter speech synthesis voices to localService === true
@@ -101,16 +107,42 @@ export default function Island() {
         text = (await navigator.clipboard.readText()).trim();
       }
 
-      if (text && text.trim().length > 0) {
-        const category = categorizeClipboard(text);
-        setClipboardContent({ text, category });
+      const cleanText = text ? text.trim() : '';
+      if (cleanText.length > 0) {
+        let nextStatus;
+        let category;
+        if (cleanText.length > MAX_SYNC_CHARS) {
+          nextStatus = 'too_large';
+          category = 'text';
+        } else if (suppressedRef.current?.text === cleanText) {
+          nextStatus = 'cleared';
+          category = suppressedRef.current.category || 'text';
+        } else {
+          const result = await desktopAPI.syncClipboardToBackend(cleanText);
+          nextStatus = result?.status || 'error';
+          category = result?.category || 'text';
+        }
+        setCaptureStatus(nextStatus);
+        setClipboardContent({ text: cleanText, category });
       } else {
+        setCaptureStatus(null);
         setClipboardContent(null);
       }
     } catch {
+      setCaptureStatus(null);
       setClipboardContent(null);
     }
   }, []);
+
+  const handleClipboardCleared = useCallback(() => {
+    if (clipboardContent) {
+      suppressedRef.current = {
+        text: clipboardContent.text,
+        category: clipboardContent.category,
+      };
+    }
+    setCaptureStatus('cleared');
+  }, [clipboardContent]);
 
   // Expand: await invoke("set_island_mode", { expanded: true }), then set expanded
   const handleExpand = useCallback(
@@ -367,6 +399,8 @@ export default function Island() {
                           clipboardContent={clipboardContent}
                           actionChips={actionChips}
                           onActionClick={handleActionChipClick}
+                          captureStatus={captureStatus}
+                          onCleared={handleClipboardCleared}
                         />
                       )}
                       {activeTab === 'stats' && <StatsTab />}
