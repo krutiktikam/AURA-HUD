@@ -20,12 +20,27 @@ def test_paused_add_stores_nothing(client: TestClient):
     assert res.status_code == 200
     assert res.json()["paused"] is True
 
-    add_res = client.post(
+    add_text = client.post(
         "/api/clipboard/add",
-        json={"content": "paused secret text", "category": "text"},
+        json={"content": "hello there"},
     )
-    assert add_res.status_code == 200
-    assert add_res.json() == {"status": "paused"}
+    assert add_text.status_code == 200
+    assert add_text.json() == {"status": "paused", "category": "text"}
+
+    add_code = client.post(
+        "/api/clipboard/add",
+        json={"content": "def add(a, b): return a + b"},
+    )
+    assert add_code.status_code == 200
+    assert add_code.json() == {"status": "paused", "category": "code"}
+
+    oversized = "x" * (settings.CLIPBOARD_MAX_CHARS + 1)
+    add_oversized = client.post(
+        "/api/clipboard/add",
+        json={"content": oversized},
+    )
+    assert add_oversized.status_code == 200
+    assert add_oversized.json() == {"status": "paused"}
 
     hist_res = client.get("/api/clipboard/history")
     assert hist_res.status_code == 200
@@ -35,7 +50,7 @@ def test_paused_add_stores_nothing(client: TestClient):
 def test_resume_allows_adds(client: TestClient):
     client.post("/api/clipboard/settings", json={"paused": True})
     paused_res = client.post("/api/clipboard/add", json={"content": "ignored"})
-    assert paused_res.json() == {"status": "paused"}
+    assert paused_res.json() == {"status": "paused", "category": "text"}
 
     resume_res = client.post("/api/clipboard/settings", json={"paused": False})
     assert resume_res.status_code == 200

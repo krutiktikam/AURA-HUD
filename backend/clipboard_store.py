@@ -161,10 +161,13 @@ def add_clipboard_entry(
 ) -> Dict[str, Any]:
     """Add a new entry to the clipboard history, avoiding consecutive duplicates."""
     path = db_path or get_db_path()
+    clean_text = content.strip()
+
     if get_settings(db_path=path)["paused"]:
+        if clean_text and len(clean_text) <= settings.CLIPBOARD_MAX_CHARS:
+            return {"status": "paused", "category": detect_category(clean_text)}
         return {"status": "paused"}
 
-    clean_text = content.strip()
     if not clean_text:
         return {"status": "empty"}
 
